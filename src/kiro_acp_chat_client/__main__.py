@@ -1,0 +1,92 @@
+"""Entry point for the Kiro ACP Chat Client application."""
+
+import asyncio
+import logging
+import sys
+import tkinter as tk
+from datetime import datetime
+from pathlib import Path
+
+from kiro_acp_chat_client.acp_client import ACPClient
+from kiro_acp_chat_client.controller import ChatController
+from kiro_acp_chat_client.preferences_manager import PreferencesManager
+from kiro_acp_chat_client.process_manager import ProcessManager
+from kiro_acp_chat_client.ui import ChatUI
+
+# Application data directory: ~/.kiro-acp-chat/
+# Uses the user's home directory so it works regardless of install method
+# (uv tool install, pipx, pip install, or running from source).
+_app_dir = Path.home() / ".kiro-acp-chat"
+_log_dir = _app_dir / "logs"
+_log_dir.mkdir(parents=True, exist_ok=True)
+_log_file = _log_dir / f"kiro-acp-chat-{datetime.now().strftime('%Y%m%d-%H%M%S')}.log"
+_preferences_file = _app_dir / "preferences.json"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    filename=str(_log_file),
+    filemode="w",
+)
+# Also print the log file location to stderr so the user knows where to find it
+print(f"Logging to: {_log_file}", file=sys.stderr)
+
+
+async def run_app() -> None:
+    """Run the application with asyncio driving the main loop.
+
+    Creates all components, wires callbacks, and runs the asyncio
+    event loop with periodic tkinter updates every 10ms.
+    """
+    root = tk.Tk()
+
+    # Create core components
+    process_manager = ProcessManager()
+    acp_client = ACPClient(process_manager)
+
+    # Flag to signal the main loop to exit
+    shutting_down = False
+
+    def on_send(text: str) -> None:
+        """Schedule controller.send_message() as an asyncio task."""
+        asyncio.ensure_future(controller.send_message(text))
+
+    def on_close() -> None:
+        """Schedule shutdown and signal the main loop to exit."""
+        nonlocal shutting_down
+        shutting_down = True
+        asyncio.ensure_future(controller.shutdown())
+
+    def on_model_changed(model_id: str) -> None:
+        """Schedule controller.on_model_changed() as an asyncio task."""
+        asyncio.ensure_future(controller.on_model_changed(model_id))
+
+    def on_mode_changed(mode_id: str) -> None:
+        """Schedule controller.on_mode_changed() as an asyncio task."""
+        asyncio.ensure_future(controller.on_mode_changed(mode_id))
+
+    # Create UI and controller
+    preferences_manager = PreferencesManager(str(_preferences_file))
+    ui = ChatUI(root, on_send, on_close, on_model_changed, on_mode_changed)
+    controller = ChatController(ui, acp_client, process_manager, preferences_manager)
+
+    # Schedule the controller startup (ACP init + session creation)
+    asyncio.ensure_future(controller.start())
+
+    # Main loop: pump tkinter events alongside asyncio
+    while not shutting_down:
+        try:
+            root.update()
+        except tk.TclError:
+            # Window has been destroyed
+            break
+        await asyncio.sleep(0.01)  # 10ms tick
+
+
+def main() -> None:
+    """Entry point for the Kiro ACP Chat Client."""
+    asyncio.run(run_app())
+
+
+if __name__ == "__main__":
+    main()
