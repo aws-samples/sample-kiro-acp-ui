@@ -1,11 +1,14 @@
 """Tkinter-based chat user interface for the Kiro ACP Chat Client."""
 
+import contextlib
 import subprocess  # nosec B404 — required for macOS system integration (notifications, sounds)
+import sys
 import tkinter as tk
-from tkinter import ttk, messagebox
-from typing import Callable, Optional
+from collections.abc import Callable
+from tkinter import messagebox, ttk
 
 from kiro_acp_chat_client.markdown_renderer import render_markdown, setup_tags
+from kiro_acp_chat_client.theme import ColorPalette, get_palette
 
 
 class ChatUI:
@@ -29,8 +32,8 @@ class ChatUI:
         root: tk.Tk,
         on_send: Callable[[str], None],
         on_close: Callable[[], None],
-        on_model_changed: Optional[Callable[[str], None]] = None,
-        on_mode_changed: Optional[Callable[[str], None]] = None,
+        on_model_changed: Callable[[str], None] | None = None,
+        on_mode_changed: Callable[[str], None] | None = None,
     ):
         """Initialize the chat UI.
 
@@ -48,6 +51,8 @@ class ChatUI:
         self._on_mode_changed = on_mode_changed
         self._has_messages = False
         self._typing_visible = False
+        self._agent_display_name: str = "Kiro"
+        self._palette: ColorPalette = get_palette()
 
         # Internal mapping from combobox index to model/mode dicts
         self._model_options: list[dict] = []
@@ -56,7 +61,7 @@ class ChatUI:
         self._setup_window()
         self._setup_widgets()
         self._setup_tags()
-        setup_tags(self._message_display)
+        setup_tags(self._message_display, palette=self._palette)
         self._setup_bindings()
         self.show_initializing()
 
@@ -82,17 +87,13 @@ class ChatUI:
         model_label = ttk.Label(toolbar_frame, text="Model:")
         model_label.pack(side=tk.LEFT, padx=(0, 4))
 
-        self._model_combobox = ttk.Combobox(
-            toolbar_frame, state="disabled", width=20
-        )
+        self._model_combobox = ttk.Combobox(toolbar_frame, state="disabled", width=20)
         self._model_combobox.pack(side=tk.LEFT, padx=(0, 12))
 
         mode_label = ttk.Label(toolbar_frame, text="Agent:")
         mode_label.pack(side=tk.LEFT, padx=(0, 4))
 
-        self._mode_combobox = ttk.Combobox(
-            toolbar_frame, state="disabled", width=20
-        )
+        self._mode_combobox = ttk.Combobox(toolbar_frame, state="disabled", width=20)
         self._mode_combobox.pack(side=tk.LEFT, padx=(0, 4))
 
         # Message display frame with scrollbar (row 1)
@@ -110,6 +111,8 @@ class ChatUI:
             pady=10,
             font=("TkDefaultFont", 10),
             spacing3=4,
+            background=self._palette["bg"],
+            foreground=self._palette["fg"],
         )
         self._message_display.grid(row=0, column=0, sticky="nsew")
 
@@ -127,9 +130,7 @@ class ChatUI:
         self._input_field = ttk.Entry(input_frame, font=("TkDefaultFont", 10))
         self._input_field.grid(row=0, column=0, sticky="ew", padx=(0, 5))
 
-        self._send_button = ttk.Button(
-            input_frame, text="Send", command=self._handle_send
-        )
+        self._send_button = ttk.Button(input_frame, text="Send", command=self._handle_send)
         self._send_button.grid(row=0, column=1)
 
         # Start with send button disabled (empty input)
@@ -139,40 +140,40 @@ class ChatUI:
         """Configure text tags for message styling."""
         self._message_display.tag_configure(
             self._TAG_USER_LABEL,
-            foreground="#1a73e8",
+            foreground=self._palette["user_label_fg"],
             font=("TkDefaultFont", 10, "bold"),
             justify=tk.RIGHT,
         )
         self._message_display.tag_configure(
             self._TAG_USER_MSG,
-            foreground="#1a1a1a",
+            foreground=self._palette["fg"],
             lmargin1=40,
             lmargin2=40,
         )
         self._message_display.tag_configure(
             self._TAG_ASSISTANT_LABEL,
-            foreground="#0d7377",
+            foreground=self._palette["assistant_label_fg"],
             font=("TkDefaultFont", 10, "bold"),
             justify=tk.LEFT,
         )
         self._message_display.tag_configure(
             self._TAG_ASSISTANT_MSG,
-            foreground="#1a1a1a",
+            foreground=self._palette["fg"],
             rmargin=40,
         )
         self._message_display.tag_configure(
             self._TAG_ERROR,
-            foreground="#d32f2f",
+            foreground=self._palette["error_fg"],
             font=("TkDefaultFont", 10, "italic"),
         )
         self._message_display.tag_configure(
             self._TAG_TYPING,
-            foreground="#757575",
+            foreground=self._palette["typing_fg"],
             font=("TkDefaultFont", 9, "italic"),
         )
         self._message_display.tag_configure(
             self._TAG_EMPTY_STATE,
-            foreground="#9e9e9e",
+            foreground=self._palette["empty_state_fg"],
             justify=tk.CENTER,
             font=("TkDefaultFont", 11),
         )
@@ -219,6 +220,10 @@ class ChatUI:
         )
         self._message_display.configure(state=tk.DISABLED)
 
+    def set_agent_name(self, name: str) -> None:
+        """Set the display name used for assistant messages and typing indicator."""
+        self._agent_display_name = name
+
     def _remove_empty_state(self) -> None:
         """Remove the empty state placeholder on first message."""
         if not self._has_messages:
@@ -244,7 +249,7 @@ class ChatUI:
         """Handle window close event."""
         self._on_close()
 
-    def _on_input_changed(self, event: tk.Event = None) -> None:
+    def _on_input_changed(self, event: tk.Event | None = None) -> None:
         """Update send button state based on input content."""
         text = self.get_input_text()
         if text.strip():
@@ -270,7 +275,7 @@ class ChatUI:
             self.scroll_to_bottom()
 
     def append_assistant_message(self, text: str) -> None:
-        """Add an assistant message to the display with 'Kiro' label.
+        """Add an assistant message to the display with the agent name label.
 
         Args:
             text: The message text to display.
@@ -279,7 +284,9 @@ class ChatUI:
         was_at_bottom = self.is_scrolled_to_bottom
 
         self._message_display.configure(state=tk.NORMAL)
-        self._message_display.insert(tk.END, "Kiro:\n", self._TAG_ASSISTANT_LABEL)
+        self._message_display.insert(
+            tk.END, f"{self._agent_display_name}:\n", self._TAG_ASSISTANT_LABEL
+        )
         render_markdown(self._message_display, text, base_tag=self._TAG_ASSISTANT_MSG)
         self._message_display.insert(tk.END, "\n\n", self._TAG_ASSISTANT_MSG)
         self._message_display.configure(state=tk.DISABLED)
@@ -304,7 +311,7 @@ class ChatUI:
             self.scroll_to_bottom()
 
     def show_typing_indicator(self) -> None:
-        """Show 'Kiro is typing...' indicator in the message display."""
+        """Show typing indicator in the message display."""
         if self._typing_visible:
             return
         self._typing_visible = True
@@ -315,7 +322,7 @@ class ChatUI:
         self._message_display.mark_set("typing_start", "end-1c")
         self._message_display.mark_gravity("typing_start", tk.LEFT)
         self._message_display.insert(
-            tk.END, "Kiro is typing...\n", self._TAG_TYPING
+            tk.END, f"{self._agent_display_name} is typing...\n", self._TAG_TYPING
         )
         self._message_display.configure(state=tk.DISABLED)
 
@@ -329,10 +336,8 @@ class ChatUI:
         self._typing_visible = False
 
         self._message_display.configure(state=tk.NORMAL)
-        try:
+        with contextlib.suppress(tk.TclError):
             self._message_display.delete("typing_start", tk.END)
-        except tk.TclError:
-            pass
         self._message_display.configure(state=tk.DISABLED)
 
     def clear_input(self) -> None:
@@ -417,7 +422,7 @@ class ChatUI:
         idx = self._model_combobox.current()
         if idx < 0 or idx >= len(self._model_options):
             return "auto"
-        return self._model_options[idx]["modelId"]
+        return str(self._model_options[idx]["modelId"])
 
     def get_selected_mode_id(self) -> str:
         """Get the id of the currently selected mode.
@@ -430,7 +435,7 @@ class ChatUI:
         idx = self._mode_combobox.current()
         if idx < 0 or idx >= len(self._mode_options):
             return ""
-        return self._mode_options[idx]["id"]
+        return str(self._mode_options[idx]["id"])
 
     def set_selectors_enabled(self, enabled: bool) -> None:
         """Enable or disable both model and mode selectors.
@@ -442,13 +447,13 @@ class ChatUI:
         self._model_combobox.configure(state=state)
         self._mode_combobox.configure(state=state)
 
-    def _on_model_selected(self, event: tk.Event = None) -> None:
+    def _on_model_selected(self, event: tk.Event | None = None) -> None:
         """Handle model combobox selection change."""
         if self._on_model_changed:
             model_id = self.get_selected_model_id()
             self._on_model_changed(model_id)
 
-    def _on_mode_selected(self, event: tk.Event = None) -> None:
+    def _on_mode_selected(self, event: tk.Event | None = None) -> None:
         """Handle mode combobox selection change."""
         if self._on_mode_changed:
             mode_id = self.get_selected_mode_id()
@@ -480,9 +485,7 @@ class ChatUI:
             return True
         # If the view starts at 0.0 and the content is small enough that
         # no scrolling has occurred, consider it at bottom
-        if yview[0] == 0.0 and yview[1] == 1.0:
-            return True
-        return False
+        return bool(yview[0] == 0.0 and yview[1] == 1.0)
 
     def scroll_to_bottom(self) -> None:
         """Scroll the message display to show the latest message."""
@@ -502,7 +505,7 @@ class ChatUI:
         # Truncate to a reasonable notification length
         return sanitized[:100]
 
-    def ask_permission(self, title: str, details: str, options: list[dict]) -> Optional[str]:
+    def ask_permission(self, title: str, details: str, options: list[dict]) -> str | None:
         """Show a permission dialog and return the selected option ID.
 
         Supports multiple options (e.g., Yes/Always/No) via a custom dialog
@@ -516,26 +519,36 @@ class ChatUI:
         Returns:
             The optionId of the selected option, or None if cancelled.
         """
-        # Play alert sound and show system notification
-        try:
-            subprocess.Popen(  # nosec B603 B607 — hardcoded executable, no user input
-                ["afplay", "/System/Library/Sounds/Glass.aiff"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        except OSError:
+        # Play alert sound and show system notification (macOS only)
+        if sys.platform == "darwin":
+            try:
+                subprocess.Popen(  # nosec B603 B607 — hardcoded executable, no user input
+                    ["afplay", "/System/Library/Sounds/Glass.aiff"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except OSError:
+                self._root.bell()
+            try:
+                # Sanitize title to prevent AppleScript injection (T1 mitigation)
+                safe_title = self._sanitize_for_applescript(title)
+                subprocess.Popen(  # nosec B603 B607 — hardcoded executable, title sanitized via T1 mitigation
+                    [
+                        "osascript",
+                        "-e",
+                        (
+                            f'display notification "{safe_title}" with title'
+                            ' "Kiro ACP Chat" subtitle "Permission Required"'
+                            ' sound name "Glass"'
+                        ),
+                    ],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except OSError:
+                pass
+        else:
             self._root.bell()
-        try:
-            # Sanitize title to prevent AppleScript injection (T1 mitigation)
-            safe_title = self._sanitize_for_applescript(title)
-            subprocess.Popen(  # nosec B603 B607 — hardcoded executable, title sanitized via T1 mitigation
-                ["osascript", "-e",
-                 f'display notification "{safe_title}" with title "Kiro ACP Chat" subtitle "Permission Required" sound name "Glass"'],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        except OSError:
-            pass
 
         # Build a detailed message showing what the tool wants to do (T5 mitigation)
         message_parts = [f"Action: {title}"]
@@ -558,16 +571,16 @@ class ChatUI:
                 parent=self._root,
             )
             if result:
-                return allow_options[0]["optionId"]
+                return str(allow_options[0]["optionId"])
             else:
-                return reject_options[0]["optionId"]
+                return str(reject_options[0]["optionId"])
 
         # Fallback: just allow
         if options:
-            return options[0]["optionId"]
+            return str(options[0]["optionId"])
         return None
 
-    def _show_multi_option_dialog(self, message: str, options: list[dict]) -> Optional[str]:
+    def _show_multi_option_dialog(self, message: str, options: list[dict]) -> str | None:
         """Show a custom dialog with multiple buttons for each option.
 
         Args:
@@ -577,7 +590,7 @@ class ChatUI:
         Returns:
             The optionId of the selected option, or None if window closed.
         """
-        selected_id: Optional[str] = None
+        selected_id: str | None = None
 
         dialog = tk.Toplevel(self._root)
         dialog.title("Tool Permission Request")
@@ -586,23 +599,27 @@ class ChatUI:
         dialog.resizable(False, False)
 
         # Center on parent
-        dialog.geometry("+%d+%d" % (
-            self._root.winfo_rootx() + 50,
-            self._root.winfo_rooty() + 50,
-        ))
+        dialog.geometry(f"+{self._root.winfo_rootx() + 50}+{self._root.winfo_rooty() + 50}")
 
         # Message frame
         msg_frame = ttk.Frame(dialog, padding=20)
         msg_frame.pack(fill=tk.BOTH, expand=True)
 
-        header = ttk.Label(msg_frame, text="Kiro wants to perform an action:",
-                           font=("TkDefaultFont", 13, "bold"))
+        header = ttk.Label(
+            msg_frame, text="Kiro wants to perform an action:", font=("TkDefaultFont", 13, "bold")
+        )
         header.pack(anchor=tk.W)
 
         # Use a Text widget for the details so long URLs wrap properly
-        detail_text = tk.Text(msg_frame, wrap=tk.WORD, height=8, width=60,
-                              relief=tk.FLAT, background=dialog.cget("background"),
-                              font=("TkDefaultFont", 12))
+        detail_text = tk.Text(
+            msg_frame,
+            wrap=tk.WORD,
+            height=8,
+            width=60,
+            relief=tk.FLAT,
+            background=dialog.cget("background"),
+            font=("TkDefaultFont", 12),
+        )
         detail_text.insert(tk.END, message)
         detail_text.configure(state="disabled")
         detail_text.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
@@ -611,11 +628,12 @@ class ChatUI:
         btn_frame = ttk.Frame(dialog, padding=(20, 0, 20, 20))
         btn_frame.pack(fill=tk.X)
 
-        def make_handler(option_id: str):
-            def handler():
+        def make_handler(option_id: str) -> Callable[[], None]:
+            def handler() -> None:
                 nonlocal selected_id
                 selected_id = option_id
                 dialog.destroy()
+
             return handler
 
         # Create a button for each option, ordered left to right
@@ -625,7 +643,7 @@ class ChatUI:
             btn.pack(side=tk.LEFT, padx=5)
 
         # Handle window close (X button) as cancel
-        def on_close():
+        def on_close() -> None:
             nonlocal selected_id
             # Default to reject if available
             reject_options = [o for o in options if "reject" in o.get("kind", "")]

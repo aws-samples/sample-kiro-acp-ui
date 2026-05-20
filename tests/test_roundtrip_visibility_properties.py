@@ -1,18 +1,18 @@
 """Property-based tests for round-trip visibility.
 
-# Feature: markdown-rendering, Property 12: Round-trip visibility — no raw delimiters in rendered output
+# Feature: markdown-rendering, Property 12: Round-trip visibility — no raw
+# delimiters in rendered output
 
 **Validates: Requirements 13.4**
 """
 
-import pytest
 import tkinter as tk
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from kiro_acp_chat_client.markdown_renderer import render_markdown, setup_tags
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -79,13 +79,17 @@ def valid_markdown_text(draw):
     - plain text (no formatting)
     """
     content = draw(_safe_text)
-    formatting = draw(st.sampled_from([
-        "bold_asterisk",
-        "italic_asterisk",
-        "inline_code",
-        "header",
-        "plain",
-    ]))
+    formatting = draw(
+        st.sampled_from(
+            [
+                "bold_asterisk",
+                "italic_asterisk",
+                "inline_code",
+                "header",
+                "plain",
+            ]
+        )
+    )
 
     if formatting == "bold_asterisk":
         return f"**{content}**"
@@ -114,7 +118,8 @@ def test_roundtrip_visibility_no_raw_delimiters_in_rendered_output(markdown_inpu
     the rendered output SHALL contain no visible raw markdown delimiter characters
     (**,  __, `, ```, # at line start) except within code block content.
 
-    # Feature: markdown-rendering, Property 12: Round-trip visibility — no raw delimiters in rendered output
+    # Feature: markdown-rendering, Property 12: Round-trip visibility — no raw
+    # delimiters in rendered output
     """
     widget = _get_widget()
     _clear_widget(widget)

@@ -5,14 +5,13 @@
 **Validates: Requirements 6.1, 7.1**
 """
 
-import pytest
 import tkinter as tk
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from kiro_acp_chat_client.markdown_renderer import Block, render_block, setup_tags
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -143,13 +142,13 @@ def test_list_items_render_with_markers_and_indentation(item_text, kind, level):
     if kind == "ulist":
         # The output should use bullet char, not raw markdown markers
         assert not rendered_text.startswith("- "), (
-            f"Raw markdown prefix '- ' should not appear in rendered output"
+            "Raw markdown prefix '- ' should not appear in rendered output"
         )
         assert not rendered_text.startswith("* "), (
-            f"Raw markdown prefix '* ' should not appear in rendered output"
+            "Raw markdown prefix '* ' should not appear in rendered output"
         )
         assert not rendered_text.startswith("+ "), (
-            f"Raw markdown prefix '+ ' should not appear in rendered output"
+            "Raw markdown prefix '+ ' should not appear in rendered output"
         )
     if kind == "olist":
         # The output should use sequential numbering from render_block,

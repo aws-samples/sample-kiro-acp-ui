@@ -1,9 +1,9 @@
 """Unit tests for the ChatUI class."""
 
-import os
-import sys
-import pytest
+import contextlib
 import tkinter as tk
+
+import pytest
 
 from kiro_acp_chat_client.ui import ChatUI
 
@@ -31,10 +31,8 @@ def chat_ui():
     ui = ChatUI(root, on_send, on_close)
     yield ui, root, send_calls, close_calls
 
-    try:
+    with contextlib.suppress(tk.TclError):
         root.destroy()
-    except tk.TclError:
-        pass
 
 
 class TestChatUIWindowSetup:
@@ -428,10 +426,8 @@ class TestChatUIToolbarCallbacks:
 
         assert model_calls == ["model-1"]
 
-        try:
+        with contextlib.suppress(tk.TclError):
             root.destroy()
-        except tk.TclError:
-            pass
 
     def test_on_mode_selected_calls_callback(self):
         """Test that selecting a mode triggers the callback."""
@@ -461,10 +457,8 @@ class TestChatUIToolbarCallbacks:
 
         assert mode_calls == ["default"]
 
-        try:
+        with contextlib.suppress(tk.TclError):
             root.destroy()
-        except tk.TclError:
-            pass
 
     def test_no_callback_when_none(self, chat_ui):
         """Test that no error occurs when callbacks are None."""

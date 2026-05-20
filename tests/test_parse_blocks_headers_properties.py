@@ -1,13 +1,13 @@
 """Property-based tests for block parser — headers.
 
-# Feature: markdown-rendering, Property 5: Header rendering removes # prefix and applies level-appropriate tag
+# Feature: markdown-rendering, Property 5: Header rendering removes # prefix
+# and applies level-appropriate tag
 """
 
-from hypothesis import given, settings, assume
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
-from kiro_acp_chat_client.markdown_renderer import Block, parse_blocks
-
+from kiro_acp_chat_client.markdown_renderer import parse_blocks
 
 # ---------------------------------------------------------------------------
 # Strategies
@@ -27,14 +27,27 @@ header_text = st.text(
 ).filter(lambda t: not t.startswith("#") and t.strip() == t and len(t.strip()) > 0)
 
 # Non-header lines: text with # mid-line (not at start)
-midline_hash_text = st.text(
-    alphabet=st.characters(
-        blacklist_categories=("Cs",),
-        blacklist_characters="\n\r|",
-    ),
-    min_size=1,
-    max_size=40,
-).map(lambda t: t.rstrip()).filter(lambda t: len(t) > 0 and not t.startswith("#") and not t.startswith("> ") and not t.startswith("- ") and not t.startswith("* ") and not t.startswith("+ "))
+midline_hash_text = (
+    st.text(
+        alphabet=st.characters(
+            blacklist_categories=("Cs",),
+            blacklist_characters="\n\r|",
+        ),
+        min_size=1,
+        max_size=40,
+    )
+    .map(lambda t: t.rstrip())
+    .filter(
+        lambda t: (
+            len(t) > 0
+            and not t.startswith("#")
+            and not t.startswith("> ")
+            and not t.startswith("- ")
+            and not t.startswith("* ")
+            and not t.startswith("+ ")
+        )
+    )
+)
 
 # Too many hashes: 7+ # characters
 too_many_hashes_level = st.integers(min_value=7, max_value=12)
@@ -55,7 +68,8 @@ def test_valid_headers_produce_header_blocks_with_correct_level(level, text):
     parse_blocks() SHALL produce a Block with kind="header" and level
     equal to the number of # characters.
 
-    # Feature: markdown-rendering, Property 5: Header rendering removes # prefix and applies level-appropriate tag
+    # Feature: markdown-rendering, Property 5: Header rendering removes
+    # # prefix and applies level-appropriate tag
     """
     markdown_line = "#" * level + " " + text
     blocks = parse_blocks(markdown_line)
@@ -74,7 +88,8 @@ def test_valid_headers_content_does_not_contain_hash_prefix(level, text):
     For any valid header line, the content field of the resulting Block
     SHALL contain the text without the leading # characters and space.
 
-    # Feature: markdown-rendering, Property 5: Header rendering removes # prefix and applies level-appropriate tag
+    # Feature: markdown-rendering, Property 5: Header rendering removes
+    # # prefix and applies level-appropriate tag
     """
     markdown_line = "#" * level + " " + text
     blocks = parse_blocks(markdown_line)
@@ -96,7 +111,8 @@ def test_hash_midline_produces_paragraph_block(prefix):
     For any line where # appears mid-line (not at the start), parse_blocks()
     SHALL produce a paragraph block, not a header block.
 
-    # Feature: markdown-rendering, Property 5: Header rendering removes # prefix and applies level-appropriate tag
+    # Feature: markdown-rendering, Property 5: Header rendering removes
+    # # prefix and applies level-appropriate tag
     """
     # Create a line with # somewhere in the middle
     line = prefix + " # something"
@@ -116,7 +132,8 @@ def test_hash_without_trailing_space_produces_paragraph(level, text):
     For any line starting with # characters but NOT followed by a space,
     parse_blocks() SHALL produce a paragraph block.
 
-    # Feature: markdown-rendering, Property 5: Header rendering removes # prefix and applies level-appropriate tag
+    # Feature: markdown-rendering, Property 5: Header rendering removes
+    # # prefix and applies level-appropriate tag
     """
     # No space between hashes and text — must not start with space
     assume(not text.startswith(" "))
@@ -137,7 +154,8 @@ def test_seven_plus_hashes_produces_paragraph(level, text):
     For any line beginning with 7 or more # characters (even followed by
     a space), parse_blocks() SHALL produce a paragraph block, not a header.
 
-    # Feature: markdown-rendering, Property 5: Header rendering removes # prefix and applies level-appropriate tag
+    # Feature: markdown-rendering, Property 5: Header rendering removes
+    # # prefix and applies level-appropriate tag
     """
     markdown_line = "#" * level + " " + text
     blocks = parse_blocks(markdown_line)

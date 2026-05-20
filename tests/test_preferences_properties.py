@@ -7,11 +7,10 @@ import json
 import os
 import tempfile
 
-from hypothesis import given, settings, assume
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from kiro_acp_chat_client.preferences_manager import Preferences, PreferencesManager
-
 
 # Strategy for generating arbitrary text that is NOT valid JSON dicts
 arbitrary_text = st.text(min_size=0, max_size=200)

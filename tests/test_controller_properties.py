@@ -8,9 +8,9 @@
 # Feature: model-agent-preferences, Property 8: Restored preferences trigger ACP requests on startup
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -106,10 +106,12 @@ async def test_successful_send_clears_input(message_text):
 
 
 # Strategy for selecting error types to simulate
-error_types = st.sampled_from([
-    lambda msg: ProcessTerminatedError(msg),
-    lambda msg: Exception(msg),
-])
+error_types = st.sampled_from(
+    [
+        lambda msg: ProcessTerminatedError(msg),
+        lambda msg: Exception(msg),
+    ]
+)
 
 # Strategy for error messages
 error_messages = st.text(
@@ -130,9 +132,7 @@ error_messages = st.text(
     error_msg=error_messages,
 )
 @pytest.mark.asyncio
-async def test_failed_send_shows_error_and_reenables_input(
-    message_text, error_factory, error_msg
-):
+async def test_failed_send_shows_error_and_reenables_input(message_text, error_factory, error_msg):
     """Property 6: Failed send retains input text.
 
     For any valid message string where the send operation fails
@@ -163,9 +163,7 @@ async def test_failed_send_shows_error_and_reenables_input(
     calls = ui.set_input_enabled.call_args_list
     assert len(calls) >= 1, "set_input_enabled should be called at least once"
     # The last call should re-enable input
-    assert calls[-1].args[0] is True, (
-        "Input should be re-enabled after a failed send"
-    )
+    assert calls[-1].args[0] is True, "Input should be re-enabled after a failed send"
 
 
 # Strategy for generating non-empty assistant response text
@@ -239,10 +237,12 @@ model_name_strings = st.text(
     max_size=50,
 ).filter(lambda s: s.strip())
 
-model_dicts = st.fixed_dictionaries({
-    "modelId": model_id_strings,
-    "name": model_name_strings,
-})
+model_dicts = st.fixed_dictionaries(
+    {
+        "modelId": model_id_strings,
+        "name": model_name_strings,
+    }
+)
 
 # Strategy for generating mode dicts with id and name
 mode_id_strings = st.text(
@@ -257,10 +257,12 @@ mode_name_strings = st.text(
     max_size=50,
 ).filter(lambda s: s.strip())
 
-mode_dicts = st.fixed_dictionaries({
-    "id": mode_id_strings,
-    "name": mode_name_strings,
-})
+mode_dicts = st.fixed_dictionaries(
+    {
+        "id": mode_id_strings,
+        "name": mode_name_strings,
+    }
+)
 
 
 # **Validates: Requirements 3.3, 3.4**
@@ -272,7 +274,8 @@ def test_resolve_model_preference_returns_saved_id_when_available(data):
     For any saved model_id that exists in the Available_Models list,
     the resolution logic SHALL return the saved ID unchanged.
 
-    # Feature: model-agent-preferences, Property 5: Preference restoration when saved ID is available
+    # Feature: model-agent-preferences, Property 5: Preference restoration
+    # when saved ID is available
 
     **Validates: Requirements 3.3, 3.4**
     """
@@ -305,7 +308,8 @@ def test_resolve_mode_preference_returns_saved_id_when_available(data):
     For any saved mode_id that exists in the Available_Modes list,
     the resolution logic SHALL return the saved ID unchanged.
 
-    # Feature: model-agent-preferences, Property 5: Preference restoration when saved ID is available
+    # Feature: model-agent-preferences, Property 5: Preference restoration
+    # when saved ID is available
 
     **Validates: Requirements 3.3, 3.4**
     """
@@ -348,16 +352,15 @@ id_strings = st.text(
     error_msg=error_messages,
 )
 @pytest.mark.asyncio
-async def test_error_response_reverts_model_selector(
-    previous_model_id, new_model_id, error_msg
-):
+async def test_error_response_reverts_model_selector(previous_model_id, new_model_id, error_msg):
     """Property 9: Error response reverts selector to previous value (model).
 
     For any model selection that results in an error response from the ACP
     process, the model selector SHALL revert to its previous value (the value
     before the user's change), and an error message SHALL be displayed.
 
-    # Feature: model-agent-preferences, Property 9: Error response reverts selector to previous value
+    # Feature: model-agent-preferences, Property 9: Error response reverts
+    # selector to previous value
 
     **Validates: Requirements 4.4**
     """
@@ -372,9 +375,7 @@ async def test_error_response_reverts_model_selector(
     controller._conversation.session_id = "session-123"
 
     # Mock set_model to return an error response
-    acp_client.set_model = AsyncMock(
-        return_value={"error": {"code": -32602, "message": error_msg}}
-    )
+    acp_client.set_model = AsyncMock(return_value={"error": {"code": -32602, "message": error_msg}})
 
     # Add set_selected_model mock
     ui.set_selected_model = MagicMock()
@@ -397,16 +398,15 @@ async def test_error_response_reverts_model_selector(
     error_msg=error_messages,
 )
 @pytest.mark.asyncio
-async def test_error_response_reverts_mode_selector(
-    previous_mode_id, new_mode_id, error_msg
-):
+async def test_error_response_reverts_mode_selector(previous_mode_id, new_mode_id, error_msg):
     """Property 9: Error response reverts selector to previous value (mode).
 
     For any mode selection that results in an error response from the ACP
     process, the mode selector SHALL revert to its previous value (the value
     before the user's change), and an error message SHALL be displayed.
 
-    # Feature: model-agent-preferences, Property 9: Error response reverts selector to previous value
+    # Feature: model-agent-preferences, Property 9: Error response reverts
+    # selector to previous value
 
     **Validates: Requirements 4.4**
     """
@@ -421,9 +421,7 @@ async def test_error_response_reverts_mode_selector(
     controller._conversation.session_id = "session-123"
 
     # Mock set_mode to return an error response
-    acp_client.set_mode = AsyncMock(
-        return_value={"error": {"code": -32602, "message": error_msg}}
-    )
+    acp_client.set_mode = AsyncMock(return_value={"error": {"code": -32602, "message": error_msg}})
 
     # Add set_selected_mode mock
     ui.set_selected_mode = MagicMock()
@@ -437,6 +435,7 @@ async def test_error_response_reverts_mode_selector(
     # Assert: error message is displayed
     ui.append_error.assert_called_once_with(error_msg)
 
+
 # --- Property 6: Preference fallback when saved ID is unavailable ---
 # Feature: model-agent-preferences, Property 6: Preference fallback when saved ID is unavailable
 
@@ -447,9 +446,7 @@ async def test_error_response_reverts_mode_selector(
     available_models=st.lists(model_dicts, min_size=0, max_size=10),
     saved_id=model_id_strings,
 )
-def test_resolve_model_preference_falls_back_to_auto_when_unavailable(
-    available_models, saved_id
-):
+def test_resolve_model_preference_falls_back_to_auto_when_unavailable(available_models, saved_id):
     """Property 6: Preference fallback when saved ID is unavailable (models).
 
     For any saved model_id that does NOT exist in the Available_Models list,
@@ -483,9 +480,7 @@ def test_resolve_model_preference_falls_back_to_auto_when_unavailable(
     available_modes=st.lists(mode_dicts, min_size=1, max_size=10),
     saved_id=mode_id_strings,
 )
-def test_resolve_mode_preference_falls_back_to_first_when_unavailable(
-    available_modes, saved_id
-):
+def test_resolve_mode_preference_falls_back_to_first_when_unavailable(available_modes, saved_id):
     """Property 6: Preference fallback when saved ID is unavailable (modes).
 
     For any saved mode_id that does NOT exist in the Available_Modes list,
@@ -543,7 +538,8 @@ async def test_restored_preferences_trigger_acp_requests_on_startup(
     that differs from the first available mode, the startup flow SHALL send
     a session/set_mode request.
 
-    # Feature: model-agent-preferences, Property 8: Restored preferences trigger ACP requests on startup
+    # Feature: model-agent-preferences, Property 8: Restored preferences
+    # trigger ACP requests on startup
 
     **Validates: Requirements 4.3**
     """
@@ -621,18 +617,22 @@ async def test_restored_preferences_trigger_acp_requests_on_startup(
 @settings(max_examples=100, deadline=None)
 @given(
     models=st.lists(
-        st.fixed_dictionaries({
-            "modelId": model_id_strings,
-            "name": model_name_strings,
-        }),
+        st.fixed_dictionaries(
+            {
+                "modelId": model_id_strings,
+                "name": model_name_strings,
+            }
+        ),
         min_size=0,
         max_size=10,
     ),
     modes=st.lists(
-        st.fixed_dictionaries({
-            "id": mode_id_strings,
-            "name": mode_name_strings,
-        }),
+        st.fixed_dictionaries(
+            {
+                "id": mode_id_strings,
+                "name": mode_name_strings,
+            }
+        ),
         min_size=0,
         max_size=10,
     ),
@@ -646,7 +646,8 @@ async def test_session_response_parsing_extracts_models_and_modes(models, modes)
     entries (preserving modelId and name) and all mode entries (preserving id and
     name) without loss or reordering.
 
-    # Feature: model-agent-preferences, Property 1: Session response parsing extracts models and modes
+    # Feature: model-agent-preferences, Property 1: Session response parsing
+    # extracts models and modes
 
     **Validates: Requirements 5.1, 5.2**
     """

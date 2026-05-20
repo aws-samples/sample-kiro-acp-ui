@@ -5,10 +5,10 @@
 **Validates: Requirements 1.3, 2.2, 3.2**
 """
 
-import pytest
 import tkinter as tk
 
-from hypothesis import given, settings, assume
+import pytest
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from kiro_acp_chat_client.markdown_renderer import render_inline, setup_tags

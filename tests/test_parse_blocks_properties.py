@@ -1,13 +1,13 @@
 """Property-based tests for parse_blocks() function.
 
-**Feature: markdown-rendering, Property 4: Fenced code block rendering preserves content and removes fences**
+**Feature: markdown-rendering, Property 4: Fenced code block rendering
+preserves content and removes fences**
 """
 
-from hypothesis import given, settings, assume
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from kiro_acp_chat_client.markdown_renderer import parse_blocks
-
 
 # ---------------------------------------------------------------------------
 # Strategies
@@ -64,13 +64,9 @@ def test_fenced_code_block_preserves_content_and_removes_fences(content_lines, l
     blocks = parse_blocks(markdown_input)
 
     # 1. parse_blocks returns exactly one block of kind "code"
-    assert len(blocks) == 1, (
-        f"Expected exactly 1 block, got {len(blocks)}: {blocks}"
-    )
+    assert len(blocks) == 1, f"Expected exactly 1 block, got {len(blocks)}: {blocks}"
     block = blocks[0]
-    assert block.kind == "code", (
-        f"Expected block kind 'code', got '{block.kind}'"
-    )
+    assert block.kind == "code", f"Expected block kind 'code', got '{block.kind}'"
 
     # 2. The content field matches the original content between fences
     assert block.content == expected_content, (
@@ -86,13 +82,13 @@ def test_fenced_code_block_preserves_content_and_removes_fences(content_lines, l
             f"Expected meta['lang'] == '{lang}', got '{block.meta['lang']}'"
         )
     else:
-        assert block.meta == {}, (
-            f"Expected empty meta when no language specified, got {block.meta}"
-        )
+        assert block.meta == {}, f"Expected empty meta when no language specified, got {block.meta}"
 
     # 4. Fence lines are not in the content
-    assert opening_fence not in block.content or opening_fence == expected_content or opening_fence in expected_content, (
-        "Opening fence should not appear in content unless it was part of the original content lines"
-    )
+    assert (
+        opening_fence not in block.content
+        or opening_fence == expected_content
+        or opening_fence in expected_content
+    ), "Opening fence should not appear in content unless it was part of the original content lines"
     # More precise check: the content should be exactly the joined content_lines
     # (already verified in assertion 2), which means fences are excluded

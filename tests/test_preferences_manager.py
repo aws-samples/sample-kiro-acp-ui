@@ -1,10 +1,6 @@
 """Unit tests for PreferencesManager and Preferences."""
 
 import json
-import os
-import tempfile
-
-import pytest
 
 from kiro_acp_chat_client.preferences_manager import Preferences, PreferencesManager
 
@@ -19,7 +15,11 @@ class TestPreferences:
 
     def test_to_dict(self):
         prefs = Preferences(model_id="claude-sonnet", mode_id="Developer")
-        assert prefs.to_dict() == {"model_id": "claude-sonnet", "mode_id": "Developer", "log_message_content": False}
+        assert prefs.to_dict() == {
+            "model_id": "claude-sonnet",
+            "mode_id": "Developer",
+            "log_message_content": False,
+        }
 
     def test_from_dict_valid(self):
         data = {"model_id": "claude-opus", "mode_id": "Kiro Default"}

@@ -1,8 +1,6 @@
 """Unit tests for data models and JSON-RPC message types."""
 
 import json
-import time
-from unittest.mock import patch
 
 from kiro_acp_chat_client.models import (
     Conversation,
@@ -57,9 +55,7 @@ class TestJsonRpcNotification:
         assert notif.params == {}
 
     def test_custom_values(self):
-        notif = JsonRpcNotification(
-            method="session/update", params={"sessionId": "abc"}
-        )
+        notif = JsonRpcNotification(method="session/update", params={"sessionId": "abc"})
         assert notif.method == "session/update"
         assert notif.params == {"sessionId": "abc"}
 
@@ -154,9 +150,7 @@ class TestToJsonLine:
         assert "id" not in data or data.get("id") is None  # notifications shouldn't need id
 
     def test_no_embedded_newlines_with_multiline_content(self):
-        req = JsonRpcRequest(
-            id=1, method="test", params={"text": "line1\nline2\nline3"}
-        )
+        req = JsonRpcRequest(id=1, method="test", params={"text": "line1\nline2\nline3"})
         line = to_json_line(req)
         # Only the trailing newline should exist
         assert line.count("\n") == 1
@@ -216,9 +210,7 @@ class TestFromJsonLine:
         assert restored.result == original.result
 
     def test_round_trip_notification(self):
-        original = JsonRpcNotification(
-            method="session/update", params={"content": "chunk"}
-        )
+        original = JsonRpcNotification(method="session/update", params={"content": "chunk"})
         restored = from_json_line(to_json_line(original))
         assert isinstance(restored, JsonRpcNotification)
         assert restored.method == original.method

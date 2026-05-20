@@ -5,14 +5,13 @@
 **Validates: Requirements 8.1**
 """
 
-import pytest
 import tkinter as tk
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from kiro_acp_chat_client.markdown_renderer import Block, render_block, setup_tags
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -88,7 +87,8 @@ def test_blockquote_rendering_removes_prefix_and_applies_styling(content):
     Note: render_block() receives a Block of kind "blockquote" where the
     content already has the `> ` prefix stripped by parse_blocks().
 
-    # Feature: markdown-rendering, Property 7: Blockquote rendering removes prefix and applies styling
+    # Feature: markdown-rendering, Property 7: Blockquote rendering removes
+    # prefix and applies styling
 
     **Validates: Requirements 8.1**
     """
@@ -116,6 +116,5 @@ def test_blockquote_rendering_removes_prefix_and_applies_styling(content):
 
     # 3. The `> ` prefix is not visible in the rendered output
     assert not rendered_text.startswith("> "), (
-        f"The '> ' prefix should not be visible in rendered output, "
-        f"but got '{rendered_text}'"
+        f"The '> ' prefix should not be visible in rendered output, but got '{rendered_text}'"
     )

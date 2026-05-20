@@ -1,7 +1,8 @@
 """Unit tests for the ChatController class."""
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from kiro_acp_chat_client.controller import ChatController
 from kiro_acp_chat_client.preferences_manager import Preferences
@@ -37,23 +38,25 @@ def mock_acp_client():
     """Create a mock ACPClient."""
     client = AsyncMock()
     client.initialize = AsyncMock(return_value={"result": {}})
-    client.create_session = AsyncMock(return_value={
-        "sessionId": "session-123",
-        "models": {
-            "currentModelId": "auto",
-            "availableModels": [
-                {"modelId": "model-a", "name": "Model A"},
-                {"modelId": "model-b", "name": "Model B"},
-            ],
-        },
-        "modes": {
-            "currentModeId": "mode-1",
-            "availableModes": [
-                {"id": "mode-1", "name": "Mode One"},
-                {"id": "mode-2", "name": "Mode Two"},
-            ],
-        },
-    })
+    client.create_session = AsyncMock(
+        return_value={
+            "sessionId": "session-123",
+            "models": {
+                "currentModelId": "auto",
+                "availableModels": [
+                    {"modelId": "model-a", "name": "Model A"},
+                    {"modelId": "model-b", "name": "Model B"},
+                ],
+            },
+            "modes": {
+                "currentModeId": "mode-1",
+                "availableModes": [
+                    {"id": "mode-1", "name": "Mode One"},
+                    {"id": "mode-2", "name": "Mode Two"},
+                ],
+            },
+        }
+    )
     client.send_prompt = AsyncMock()
     client.read_update = AsyncMock()
     client.set_model = AsyncMock(return_value={"id": 3, "result": {}})
@@ -88,9 +91,7 @@ def controller(mock_ui, mock_acp_client, mock_process_manager, mock_preferences_
 class TestStart:
     """Tests for ChatController.start()."""
 
-    async def test_start_initializes_and_creates_session(
-        self, controller, mock_acp_client
-    ):
+    async def test_start_initializes_and_creates_session(self, controller, mock_acp_client):
         """start() calls initialize and create_session."""
         await controller.start()
 
@@ -108,27 +109,37 @@ class TestStart:
 
         assert controller._conversation.session_id == "sess-abc"
 
-    async def test_start_uses_cwd(self, controller, mock_acp_client):
-        """start() passes os.getcwd() to create_session."""
-        with patch("kiro_acp_chat_client.controller.os.getcwd", return_value="/test/dir"):
-            await controller.start()
+    async def test_start_uses_cwd(
+        self, mock_ui, mock_acp_client, mock_process_manager, mock_preferences_manager
+    ):
+        """start() passes cwd to create_session."""
+        controller = ChatController(
+            mock_ui,
+            mock_acp_client,
+            mock_process_manager,
+            mock_preferences_manager,
+            cwd="/test/dir",
+        )
+        await controller.start()
 
         mock_acp_client.create_session.assert_called_once_with("/test/dir")
 
-    async def test_start_populates_models_and_modes(
-        self, controller, mock_acp_client, mock_ui
-    ):
+    async def test_start_populates_models_and_modes(self, controller, mock_acp_client, mock_ui):
         """start() populates model and mode dropdowns from session response."""
         await controller.start()
 
-        mock_ui.populate_models.assert_called_once_with([
-            {"modelId": "model-a", "name": "Model A"},
-            {"modelId": "model-b", "name": "Model B"},
-        ])
-        mock_ui.populate_modes.assert_called_once_with([
-            {"id": "mode-1", "name": "Mode One"},
-            {"id": "mode-2", "name": "Mode Two"},
-        ])
+        mock_ui.populate_models.assert_called_once_with(
+            [
+                {"modelId": "model-a", "name": "Model A"},
+                {"modelId": "model-b", "name": "Model B"},
+            ]
+        )
+        mock_ui.populate_modes.assert_called_once_with(
+            [
+                {"id": "mode-1", "name": "Mode One"},
+                {"id": "mode-2", "name": "Mode Two"},
+            ]
+        )
 
     async def test_start_restores_default_preferences(
         self, controller, mock_acp_client, mock_ui, mock_preferences_manager
@@ -175,9 +186,7 @@ class TestStart:
         mock_acp_client.set_model.assert_not_called()
         mock_acp_client.set_mode.assert_not_called()
 
-    async def test_start_saves_resolved_preferences(
-        self, controller, mock_preferences_manager
-    ):
+    async def test_start_saves_resolved_preferences(self, controller, mock_preferences_manager):
         """start() saves resolved preferences after startup."""
         mock_preferences_manager.load.return_value = Preferences()
         await controller.start()
@@ -186,9 +195,7 @@ class TestStart:
             Preferences(model_id="auto", mode_id="mode-1")
         )
 
-    async def test_start_enables_selectors_on_success(
-        self, controller, mock_ui
-    ):
+    async def test_start_enables_selectors_on_success(self, controller, mock_ui):
         """start() enables selectors on successful startup."""
         await controller.start()
 
@@ -196,18 +203,14 @@ class TestStart:
         calls = mock_ui.set_selectors_enabled.call_args_list
         assert calls[-1].args[0] is True
 
-    async def test_start_error_disables_input(
-        self, controller, mock_acp_client, mock_ui
-    ):
+    async def test_start_error_disables_input(self, controller, mock_acp_client, mock_ui):
         """start() disables input on error."""
         mock_acp_client.initialize.side_effect = ProcessStartError("Not found")
         await controller.start()
 
         mock_ui.set_input_enabled.assert_called_with(False)
 
-    async def test_start_error_disables_selectors(
-        self, controller, mock_acp_client, mock_ui
-    ):
+    async def test_start_error_disables_selectors(self, controller, mock_acp_client, mock_ui):
         """start() disables selectors on error."""
         mock_acp_client.initialize.side_effect = ProcessStartError("Not found")
         await controller.start()
@@ -216,32 +219,22 @@ class TestStart:
         calls = mock_ui.set_selectors_enabled.call_args_list
         assert calls[-1].args[0] is False
 
-    async def test_start_error_shows_error_message(
-        self, controller, mock_acp_client, mock_ui
-    ):
+    async def test_start_error_shows_error_message(self, controller, mock_acp_client, mock_ui):
         """start() shows error in UI on failure."""
-        mock_acp_client.initialize.side_effect = ProcessStartError(
-            "Could not find kiro-cli."
-        )
+        mock_acp_client.initialize.side_effect = ProcessStartError("Could not find kiro-cli.")
         await controller.start()
 
         mock_ui.append_error.assert_called_once_with("Could not find kiro-cli.")
 
-    async def test_start_session_creation_error(
-        self, controller, mock_acp_client, mock_ui
-    ):
+    async def test_start_session_creation_error(self, controller, mock_acp_client, mock_ui):
         """start() handles session creation failure."""
-        mock_acp_client.create_session.side_effect = ProcessTerminatedError(
-            "Connection lost"
-        )
+        mock_acp_client.create_session.side_effect = ProcessTerminatedError("Connection lost")
         await controller.start()
 
         mock_ui.set_input_enabled.assert_called_with(False)
         mock_ui.append_error.assert_called_once_with("Connection lost")
 
-    async def test_start_missing_models_field(
-        self, controller, mock_acp_client, mock_ui
-    ):
+    async def test_start_missing_models_field(self, controller, mock_acp_client, mock_ui):
         """start() handles missing models field gracefully."""
         mock_acp_client.create_session.return_value = {
             "sessionId": "sess-1",
@@ -251,9 +244,7 @@ class TestStart:
 
         mock_ui.populate_models.assert_called_once_with([])
 
-    async def test_start_missing_modes_field(
-        self, controller, mock_acp_client, mock_ui
-    ):
+    async def test_start_missing_modes_field(self, controller, mock_acp_client, mock_ui):
         """start() handles missing modes field gracefully."""
         mock_acp_client.create_session.return_value = {
             "sessionId": "sess-1",
@@ -310,9 +301,7 @@ class TestSendMessage:
         mock_ui.append_user_message.assert_not_called()
         mock_ui.clear_input.assert_not_called()
 
-    async def test_send_exactly_2000_chars_succeeds(
-        self, controller, mock_ui, mock_acp_client
-    ):
+    async def test_send_exactly_2000_chars_succeeds(self, controller, mock_ui, mock_acp_client):
         """send_message with exactly 2000 chars is valid."""
         # Set up streaming response
         mock_acp_client.read_update.side_effect = [
@@ -332,9 +321,7 @@ class TestSendMessage:
 
         mock_ui.append_user_message.assert_called_once_with("a" * 2000)
 
-    async def test_send_displays_user_message(
-        self, controller, mock_ui, mock_acp_client
-    ):
+    async def test_send_displays_user_message(self, controller, mock_ui, mock_acp_client):
         """send_message displays the user message in UI."""
         mock_acp_client.read_update.side_effect = [
             {
@@ -372,9 +359,7 @@ class TestSendMessage:
 
         mock_ui.clear_input.assert_called_once()
 
-    async def test_send_shows_typing_indicator(
-        self, controller, mock_ui, mock_acp_client
-    ):
+    async def test_send_shows_typing_indicator(self, controller, mock_ui, mock_acp_client):
         """send_message shows typing indicator."""
         mock_acp_client.read_update.side_effect = [
             {"id": 2, "result": {}},
@@ -384,9 +369,7 @@ class TestSendMessage:
 
         mock_ui.show_typing_indicator.assert_called_once()
 
-    async def test_send_disables_input_during_response(
-        self, controller, mock_ui, mock_acp_client
-    ):
+    async def test_send_disables_input_during_response(self, controller, mock_ui, mock_acp_client):
         """send_message disables input while waiting for response."""
         mock_acp_client.read_update.side_effect = [
             {"id": 2, "result": {}},
@@ -398,9 +381,7 @@ class TestSendMessage:
         mock_ui.set_input_enabled.assert_any_call(False)
         mock_ui.set_input_enabled.assert_any_call(True)
 
-    async def test_send_streams_response_chunks(
-        self, controller, mock_ui, mock_acp_client
-    ):
+    async def test_send_streams_response_chunks(self, controller, mock_ui, mock_acp_client):
         """send_message accumulates streaming chunks and displays full response."""
         mock_acp_client.read_update.side_effect = [
             {
@@ -428,9 +409,7 @@ class TestSendMessage:
 
         mock_ui.append_assistant_message.assert_called_once_with("Hello world!")
 
-    async def test_send_hides_typing_on_complete(
-        self, controller, mock_ui, mock_acp_client
-    ):
+    async def test_send_hides_typing_on_complete(self, controller, mock_ui, mock_acp_client):
         """send_message hides typing indicator when response is complete."""
         mock_acp_client.read_update.side_effect = [
             {
@@ -449,9 +428,7 @@ class TestSendMessage:
 
         mock_ui.hide_typing_indicator.assert_called_once()
 
-    async def test_send_reenables_input_on_complete(
-        self, controller, mock_ui, mock_acp_client
-    ):
+    async def test_send_reenables_input_on_complete(self, controller, mock_ui, mock_acp_client):
         """send_message re-enables input when response is complete."""
         mock_acp_client.read_update.side_effect = [
             {"id": 2, "result": {}},
@@ -481,9 +458,7 @@ class TestSendMessage:
         calls = mock_ui.set_input_enabled.call_args_list
         assert calls[-1].args[0] is True
 
-    async def test_send_error_during_streaming(
-        self, controller, mock_ui, mock_acp_client
-    ):
+    async def test_send_error_during_streaming(self, controller, mock_ui, mock_acp_client):
         """send_message handles error during streaming."""
         mock_acp_client.read_update.side_effect = ProcessTerminatedError(
             "Connection to Kiro lost. Please restart the application."
@@ -496,9 +471,7 @@ class TestSendMessage:
         calls = mock_ui.set_input_enabled.call_args_list
         assert calls[-1].args[0] is True
 
-    async def test_send_empty_response_shows_error(
-        self, controller, mock_ui, mock_acp_client
-    ):
+    async def test_send_empty_response_shows_error(self, controller, mock_ui, mock_acp_client):
         """send_message shows error when agent returns empty response."""
         mock_acp_client.read_update.side_effect = [
             {"id": 2, "result": {}},
@@ -510,9 +483,7 @@ class TestSendMessage:
             "Kiro could not generate a response. Please try again."
         )
 
-    async def test_send_adds_to_conversation(
-        self, controller, mock_acp_client
-    ):
+    async def test_send_adds_to_conversation(self, controller, mock_acp_client):
         """send_message adds user message to conversation model."""
         mock_acp_client.read_update.side_effect = [
             {
@@ -539,9 +510,7 @@ class TestSendMessage:
 class TestShutdown:
     """Tests for ChatController.shutdown()."""
 
-    async def test_shutdown_calls_process_manager(
-        self, controller, mock_process_manager
-    ):
+    async def test_shutdown_calls_process_manager(self, controller, mock_process_manager):
         """shutdown() calls process_manager.shutdown()."""
         await controller.shutdown()
 

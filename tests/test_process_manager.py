@@ -74,10 +74,10 @@ class TestProcessManagerStart:
     @pytest.mark.asyncio
     async def test_timeout_raises_process_start_error(self):
         with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
-            mock_exec.side_effect = asyncio.TimeoutError()
+            mock_exec.side_effect = TimeoutError()
 
             with patch("asyncio.wait_for", new_callable=AsyncMock) as mock_wait_for:
-                mock_wait_for.side_effect = asyncio.TimeoutError()
+                mock_wait_for.side_effect = TimeoutError()
                 pm = ProcessManager()
 
                 with pytest.raises(ProcessStartError, match="did not respond"):
@@ -197,7 +197,7 @@ class TestProcessManagerShutdown:
             # Consume the awaitable to avoid warnings
             if asyncio.iscoroutine(coro):
                 coro.close()
-            raise asyncio.TimeoutError()
+            raise TimeoutError()
 
         with patch(
             "kiro_acp_chat_client.process_manager.asyncio.wait_for",

@@ -5,9 +5,10 @@
 # Feature: model-agent-preferences, Property 2: Dropdown displays name field as label
 """
 
-import pytest
+import contextlib
 import tkinter as tk
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -37,10 +38,8 @@ def _create_chat_ui():
 
 def _destroy_chat_ui(root):
     """Safely destroy the tkinter root window."""
-    try:
+    with contextlib.suppress(tk.TclError):
         root.destroy()
-    except tk.TclError:
-        pass
 
 
 # Strategy for generating whitespace-only strings (spaces, tabs, newlines, empty)
@@ -88,7 +87,8 @@ def test_whitespace_only_input_rejected(whitespace_input):
         # Assert: attempting to send does nothing (callback not invoked)
         ui._handle_send()
         assert len(send_calls) == 0, (
-            f"Send callback should not be invoked for whitespace-only input: {repr(whitespace_input)}"
+            "Send callback should not be invoked for whitespace-only input:"
+            f" {repr(whitespace_input)}"
         )
     finally:
         _destroy_chat_ui(root)
@@ -188,36 +188,48 @@ def test_messages_maintain_chronological_order(messages):
 
 # Strategy for generating model dicts with modelId and name keys
 model_dicts = st.lists(
-    st.fixed_dictionaries({
-        "modelId": st.text(
-            alphabet=st.characters(whitelist_categories=("L", "N", "P"), blacklist_characters="\x00"),
-            min_size=1,
-            max_size=50,
-        ),
-        "name": st.text(
-            alphabet=st.characters(whitelist_categories=("L", "N", "P", "Z"), blacklist_characters="\x00"),
-            min_size=1,
-            max_size=50,
-        ),
-    }),
+    st.fixed_dictionaries(
+        {
+            "modelId": st.text(
+                alphabet=st.characters(
+                    whitelist_categories=("L", "N", "P"), blacklist_characters="\x00"
+                ),
+                min_size=1,
+                max_size=50,
+            ),
+            "name": st.text(
+                alphabet=st.characters(
+                    whitelist_categories=("L", "N", "P", "Z"), blacklist_characters="\x00"
+                ),
+                min_size=1,
+                max_size=50,
+            ),
+        }
+    ),
     min_size=0,
     max_size=10,
 )
 
 # Strategy for generating mode dicts with id and name keys
 mode_dicts = st.lists(
-    st.fixed_dictionaries({
-        "id": st.text(
-            alphabet=st.characters(whitelist_categories=("L", "N", "P"), blacklist_characters="\x00"),
-            min_size=1,
-            max_size=50,
-        ),
-        "name": st.text(
-            alphabet=st.characters(whitelist_categories=("L", "N", "P", "Z"), blacklist_characters="\x00"),
-            min_size=1,
-            max_size=50,
-        ),
-    }),
+    st.fixed_dictionaries(
+        {
+            "id": st.text(
+                alphabet=st.characters(
+                    whitelist_categories=("L", "N", "P"), blacklist_characters="\x00"
+                ),
+                min_size=1,
+                max_size=50,
+            ),
+            "name": st.text(
+                alphabet=st.characters(
+                    whitelist_categories=("L", "N", "P", "Z"), blacklist_characters="\x00"
+                ),
+                min_size=1,
+                max_size=50,
+            ),
+        }
+    ),
     min_size=0,
     max_size=10,
 )
@@ -251,9 +263,7 @@ def test_populate_models_displays_name_as_label(models):
         expected = ["auto"] + [m["name"] for m in models]
 
         assert combobox_values == expected, (
-            f"Model combobox values mismatch.\n"
-            f"Expected: {expected}\n"
-            f"Got: {combobox_values}"
+            f"Model combobox values mismatch.\nExpected: {expected}\nGot: {combobox_values}"
         )
     finally:
         _destroy_chat_ui(root)
@@ -287,9 +297,7 @@ def test_populate_modes_displays_name_as_label(modes):
         expected = [m["name"] for m in modes]
 
         assert combobox_values == expected, (
-            f"Mode combobox values mismatch.\n"
-            f"Expected: {expected}\n"
-            f"Got: {combobox_values}"
+            f"Mode combobox values mismatch.\nExpected: {expected}\nGot: {combobox_values}"
         )
     finally:
         _destroy_chat_ui(root)

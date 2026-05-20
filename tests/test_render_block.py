@@ -1,7 +1,8 @@
 """Unit tests for render_block() dispatch and individual block renderers."""
 
-import pytest
 import tkinter as tk
+
+import pytest
 
 from kiro_acp_chat_client.markdown_renderer import (
     Block,

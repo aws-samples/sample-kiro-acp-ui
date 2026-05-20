@@ -1,7 +1,9 @@
 """Quick verification that the markdown_renderer module skeleton is correct."""
 
-import pytest
 import tkinter as tk
+
+import pytest
+
 from kiro_acp_chat_client.markdown_renderer import (
     MARKDOWN_TAGS,
     Block,
@@ -22,12 +24,23 @@ def _make_root():
 
 def test_markdown_tags_contains_all_expected_keys():
     expected_tags = [
-        "md_h1", "md_h2", "md_h3", "md_h4", "md_h5", "md_h6",
-        "md_bold", "md_italic", "md_bold_italic", "md_inline_code",
+        "md_h1",
+        "md_h2",
+        "md_h3",
+        "md_h4",
+        "md_h5",
+        "md_h6",
+        "md_bold",
+        "md_italic",
+        "md_bold_italic",
+        "md_inline_code",
         "md_code_block",
-        "md_list_1", "md_list_2", "md_list_3",
+        "md_list_1",
+        "md_list_2",
+        "md_list_3",
         "md_blockquote",
-        "md_table", "md_table_header",
+        "md_table",
+        "md_table_header",
         "md_link",
         "md_hrule",
     ]
@@ -46,7 +59,7 @@ def test_setup_tags_configures_widget():
         bg = text_widget.tag_cget("md_code_block", "background")
         assert bg == "#f5f5f5"
         underline = text_widget.tag_cget("md_link", "underline")
-        assert underline == "1"  # tkinter returns "1" for True
+        assert str(underline) == "1"  # handle both string and integer return types from tkinter
     finally:
         root.destroy()
 

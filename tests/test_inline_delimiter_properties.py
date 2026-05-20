@@ -1,18 +1,18 @@
 """Property-based tests for inline delimiter rendering.
 
-# Feature: markdown-rendering, Property 1: Inline delimiter rendering removes delimiters and applies tags
+# Feature: markdown-rendering, Property 1: Inline delimiter rendering removes
+# delimiters and applies tags
 
 **Validates: Requirements 1.1, 2.1, 3.1**
 """
 
-import pytest
 import tkinter as tk
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from kiro_acp_chat_client.markdown_renderer import render_inline, setup_tags
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -73,13 +73,15 @@ safe_text = st.text(
 ).filter(lambda s: s.strip() != "" and "\n" not in s and "\r" not in s)
 
 # Delimiter types and their expected tags
-delimiter_info = st.sampled_from([
-    ("**", "**", "md_bold"),
-    ("__", "__", "md_bold"),
-    ("*", "*", "md_italic"),
-    ("_", "_", "md_italic"),
-    ("`", "`", "md_inline_code"),
-])
+delimiter_info = st.sampled_from(
+    [
+        ("**", "**", "md_bold"),
+        ("__", "__", "md_bold"),
+        ("*", "*", "md_italic"),
+        ("_", "_", "md_italic"),
+        ("`", "`", "md_inline_code"),
+    ]
+)
 
 
 # ---------------------------------------------------------------------------
@@ -101,7 +103,8 @@ def test_inline_delimiter_rendering_removes_delimiters_and_applies_tags(content,
     characters are absent from the displayed text and the appropriate formatting
     tag is applied.
 
-    # Feature: markdown-rendering, Property 1: Inline delimiter rendering removes delimiters and applies tags
+    # Feature: markdown-rendering, Property 1: Inline delimiter rendering
+    # removes delimiters and applies tags
     """
     open_delim, close_delim, expected_tag = delim_data
 

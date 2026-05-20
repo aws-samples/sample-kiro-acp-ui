@@ -5,14 +5,13 @@
 **Validates: Requirements 12.4**
 """
 
-import pytest
 import tkinter as tk
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from kiro_acp_chat_client.markdown_renderer import render_markdown, setup_tags
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -134,8 +133,7 @@ def test_plain_text_transparency(text):
     # 2. The base tag is applied to the rendered text
     tags_at_start = _get_tags_at(widget, "1.0")
     assert "base" in tags_at_start, (
-        f"Expected 'base' tag to be applied at start of text, "
-        f"but found tags: {tags_at_start}"
+        f"Expected 'base' tag to be applied at start of text, but found tags: {tags_at_start}"
     )
 
     # 3. No markdown-specific tags are applied anywhere in the text

@@ -3,11 +3,10 @@
 # Feature: markdown-rendering, Property 8: Horizontal rule detection and rendering
 """
 
-from hypothesis import given, settings, assume
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from kiro_acp_chat_client.markdown_renderer import parse_blocks
-
 
 # ---------------------------------------------------------------------------
 # Strategies
@@ -36,7 +35,7 @@ def hrule_line(draw):
 
     if spaces:
         # Insert spaces between characters
-        return (" ".join([char] * count))
+        return " ".join([char] * count)
     else:
         return char * count
 
@@ -105,9 +104,7 @@ def test_fewer_than_three_chars_not_hrule(char, count):
     blocks = parse_blocks(line)
     # Should not be an hrule
     for block in blocks:
-        assert block.kind != "hrule", (
-            f"Expected non-hrule for input: {line!r}, got kind='hrule'"
-        )
+        assert block.kind != "hrule", f"Expected non-hrule for input: {line!r}, got kind='hrule'"
 
 
 # **Validates: Requirements 9.1**
