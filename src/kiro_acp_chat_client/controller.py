@@ -27,11 +27,13 @@ class ChatController:
         acp_client: ACPClient,
         process_manager: ProcessManager,
         preferences_manager: PreferencesManager,
+        cwd: str | None = None,
     ) -> None:
         self._ui = ui
         self._acp_client = acp_client
         self._process_manager = process_manager
         self._preferences_manager = preferences_manager
+        self._cwd = cwd or os.getcwd()
         self._conversation = Conversation()
         self._available_models: list[dict] = []
         self._available_modes: list[dict] = []
@@ -54,7 +56,7 @@ class ChatController:
         try:
             await self._process_manager.start()
             await self._acp_client.initialize()
-            session_result = await self._acp_client.create_session(os.getcwd())
+            session_result = await self._acp_client.create_session(self._cwd)
             session_id = session_result.get("sessionId", "")
             self._conversation.session_id = session_id
             logger.info("Startup complete. Session ID: %s", session_id)
@@ -62,8 +64,12 @@ class ChatController:
             # Parse models and modes from session response
             models_data = session_result.get("models", {})
             modes_data = session_result.get("modes", {})
-            available_models = models_data.get("availableModels", []) if isinstance(models_data, dict) else []
-            available_modes = modes_data.get("availableModes", []) if isinstance(modes_data, dict) else []
+            available_models = (
+                models_data.get("availableModels", []) if isinstance(models_data, dict) else []
+            )
+            available_modes = (
+                modes_data.get("availableModes", []) if isinstance(modes_data, dict) else []
+            )
             self._available_models = available_models
             self._available_modes = available_modes
 
@@ -90,7 +96,16 @@ class ChatController:
                 await self._acp_client.set_mode(session_id, restored_mode)
 
             # Save resolved preferences
-            self._preferences_manager.save(Preferences(model_id=restored_model, mode_id=restored_mode))
+            self._preferences_manager.save(
+                Preferences(
+                    model_id=restored_model,
+                    mode_id=restored_mode,
+                    log_message_content=self._log_message_content,
+                )
+            )
+
+            # Set agent display name based on initial mode
+            self._ui.set_agent_name(self._get_mode_name(restored_mode))
 
             # Session ready — show ready state and enable input/selectors
             self._ui.show_ready()
@@ -109,7 +124,7 @@ class ChatController:
         3. Clear input field
         4. Show typing indicator, disable input
         5. Send prompt via ACP
-        6. Stream response chunks to UI
+        6. Stream response chunks via _stream_response()
         7. Remove typing indicator, re-enable input
         On error: hide typing indicator, show error, retain input text, re-enable input
         """
@@ -117,13 +132,21 @@ class ChatController:
         if not text or not text.strip():
             return
         if len(text) > self.MAX_MESSAGE_LENGTH:
+            self._ui.append_error(
+                f"Message too long ({len(text)} chars). Maximum is {self.MAX_MESSAGE_LENGTH}."
+            )
             return
 
         # Add user message to conversation and display in UI
         if self._log_message_content:
-            logger.info("Sending message with session_id=%s: %s", self._conversation.session_id, text[:50])
+            logger.info(
+                "Sending message with session_id=%s: %s", self._conversation.session_id, text[:50]
+            )
         else:
-            logger.info("Sending message with session_id=%s (content logging disabled)", self._conversation.session_id)
+            logger.info(
+                "Sending message with session_id=%s (content logging disabled)",
+                self._conversation.session_id,
+            )
         self._conversation.add_user_message(text)
         self._ui.append_user_message(text)
 
@@ -137,53 +160,13 @@ class ChatController:
 
         try:
             # Send prompt via ACP client
-            await self._acp_client.send_prompt(
-                self._conversation.session_id, text
-            )
+            session_id = self._conversation.session_id or ""
+            await self._acp_client.send_prompt(session_id, text)
 
-            # Read streaming updates
-            chunks: list[str] = []
-            while True:
-                message = await self._acp_client.read_update()
-
-                # Check if this is a request from the agent (has both "id" and "method")
-                if "id" in message and "method" in message:
-                    method = message.get("method", "")
-                    if method == "session/request_permission":
-                        # Agent is asking for tool permission
-                        await self._handle_permission_request(message)
-                        continue
-                    else:
-                        # Unknown request from agent — skip
-                        logger.warning("Unknown request from agent: %s", method)
-                        continue
-
-                # Check if this is the final response (has "id" but no "method")
-                if "id" in message and "method" not in message:
-                    # Turn is complete
-                    break
-
-                # Check if this is a session/update notification with agent_message_chunk
-                method = message.get("method", "")
-                if method == "session/update":
-                    params = message.get("params", {})
-                    update = params.get("update", {})
-                    session_update_type = update.get("sessionUpdate", "")
-                    if session_update_type == "agent_message_chunk":
-                        content = update.get("content", {})
-                        if content.get("type") == "text":
-                            chunk = content.get("text", "")
-                            chunks.append(chunk)
-                    elif session_update_type == "tool_call":
-                        # Tool is being invoked
-                        tool_title = update.get("title", "unknown tool")
-                        logger.info("Tool call: %s", tool_title)
-
-                # All other notifications (commands/available, metadata, mcp events, etc.)
-                # are silently skipped
+            # Stream and accumulate the response
+            assistant_text = await self._stream_response()
 
             # Display the full assistant response
-            assistant_text = "".join(chunks)
             self._ui.hide_typing_indicator()
             if assistant_text:
                 self._conversation.add_assistant_message(assistant_text)
@@ -204,6 +187,62 @@ class ChatController:
             self._ui.append_error(str(e))
             self._ui.set_input_enabled(True)
             self._conversation.is_waiting = False
+
+    async def _stream_response(self) -> str:
+        """Read streaming updates and return the accumulated response text.
+
+        Handles:
+        - session/update notifications with agent_message_chunk
+        - session/request_permission requests
+        - Final response detection (message with id but no method)
+
+        Returns:
+            The concatenated assistant response text.
+
+        Raises:
+            Exception: Propagated from read_update() on connection errors.
+        """
+        chunks: list[str] = []
+        while True:
+            message = await self._acp_client.read_update()
+
+            # Check if this is a request from the agent (has both "id" and "method")
+            if "id" in message and "method" in message:
+                method = message.get("method", "")
+                if method == "session/request_permission":
+                    # Agent is asking for tool permission
+                    await self._handle_permission_request(message)
+                    continue
+                else:
+                    # Unknown request from agent — skip
+                    logger.warning("Unknown request from agent: %s", method)
+                    continue
+
+            # Check if this is the final response (has "id" but no "method")
+            if "id" in message and "method" not in message:
+                # Turn is complete
+                break
+
+            # Check if this is a session/update notification with agent_message_chunk
+            method = message.get("method", "")
+            if method == "session/update":
+                params = message.get("params", {})
+                update = params.get("update", {})
+                session_update_type = update.get("sessionUpdate", "")
+                if session_update_type == "agent_message_chunk":
+                    content = update.get("content", {})
+                    if content.get("type") == "text":
+                        chunk = content.get("text", "")
+                        chunks.append(chunk)
+                elif session_update_type == "tool_call":
+                    # Tool is being invoked
+                    tool_title = update.get("title", "unknown tool")
+                    logger.info("Tool call: %s", tool_title)
+
+            # All other notifications (commands/available, metadata, mcp events, etc.)
+            # are silently skipped
+
+        return "".join(chunks)
 
     def _resolve_model_preference(self, saved_id: str, available: list[dict]) -> str:
         """Resolve a saved model preference against available models.
@@ -226,7 +265,17 @@ class ChatController:
         for mode in available:
             if mode.get("id") == saved_id:
                 return saved_id
-        return available[0].get("id", "")
+        return str(available[0].get("id", ""))
+
+    def _get_mode_name(self, mode_id: str) -> str:
+        """Get the display name for a mode by its ID.
+
+        Returns the mode's name if found, otherwise "Kiro" as fallback.
+        """
+        for mode in self._available_modes:
+            if mode.get("id") == mode_id:
+                return str(mode.get("name", "Kiro"))
+        return "Kiro"
 
     async def on_model_changed(self, model_id: str) -> None:
         """Handle user changing the model selection.
@@ -236,9 +285,8 @@ class ChatController:
         """
         previous_model_id = self._current_model_id
         try:
-            response = await self._acp_client.set_model(
-                self._conversation.session_id, model_id
-            )
+            session_id = self._conversation.session_id or ""
+            response = await self._acp_client.set_model(session_id, model_id)
             if "error" in response:
                 # Revert selector and show error
                 self._ui.set_selected_model(previous_model_id)
@@ -248,7 +296,11 @@ class ChatController:
             # Success: update current and save preferences
             self._current_model_id = model_id
             self._preferences_manager.save(
-                Preferences(model_id=model_id, mode_id=self._current_mode_id)
+                Preferences(
+                    model_id=model_id,
+                    mode_id=self._current_mode_id,
+                    log_message_content=self._log_message_content,
+                )
             )
         except Exception as e:
             # Revert selector and show error
@@ -263,9 +315,8 @@ class ChatController:
         """
         previous_mode_id = self._current_mode_id
         try:
-            response = await self._acp_client.set_mode(
-                self._conversation.session_id, mode_id
-            )
+            session_id = self._conversation.session_id or ""
+            response = await self._acp_client.set_mode(session_id, mode_id)
             if "error" in response:
                 # Revert selector and show error
                 self._ui.set_selected_mode(previous_mode_id)
@@ -274,8 +325,13 @@ class ChatController:
                 return
             # Success: update current and save preferences
             self._current_mode_id = mode_id
+            self._ui.set_agent_name(self._get_mode_name(mode_id))
             self._preferences_manager.save(
-                Preferences(model_id=self._current_model_id, mode_id=mode_id)
+                Preferences(
+                    model_id=self._current_model_id,
+                    mode_id=mode_id,
+                    log_message_content=self._log_message_content,
+                )
             )
         except Exception as e:
             # Revert selector and show error

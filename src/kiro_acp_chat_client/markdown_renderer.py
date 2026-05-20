@@ -17,8 +17,12 @@ from __future__ import annotations
 import re
 import tkinter as tk
 import webbrowser
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from kiro_acp_chat_client.theme import ColorPalette
 
 # ---------------------------------------------------------------------------
 # Tag definitions
@@ -64,7 +68,12 @@ MARKDOWN_TAGS: dict[str, dict] = {
 # Link counter for unique tag names
 # ---------------------------------------------------------------------------
 
-_link_counter: int = 0
+
+def _get_link_counter(text_widget: tk.Text) -> int:
+    """Get and increment the link counter for a specific widget."""
+    counter = getattr(text_widget, "_md_link_counter", 0)
+    text_widget._md_link_counter = counter + 1  # type: ignore[attr-defined]
+    return counter
 
 
 def _is_valid_url(url: str) -> bool:
@@ -83,7 +92,7 @@ def _is_valid_url(url: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def setup_tags(text_widget: tk.Text) -> None:
+def setup_tags(text_widget: tk.Text, palette: ColorPalette | None = None) -> None:
     """Configure all markdown-related tags on the text widget.
 
     This should be called once during widget initialization to register
@@ -91,9 +100,18 @@ def setup_tags(text_widget: tk.Text) -> None:
 
     Args:
         text_widget: The tk.Text widget to configure tags on.
+        palette: Optional color palette to override default tag colors.
     """
     for tag_name, config in MARKDOWN_TAGS.items():
         text_widget.tag_configure(tag_name, **config)
+
+    # Apply palette overrides if provided
+    if palette is not None:
+        text_widget.tag_configure("md_code_block", background=palette["code_block_bg"])
+        text_widget.tag_configure("md_inline_code", background=palette["inline_code_bg"])
+        text_widget.tag_configure("md_link", foreground=palette["link_fg"])
+        text_widget.tag_configure("md_blockquote", foreground=palette["blockquote_fg"])
+        text_widget.tag_configure("md_hrule", foreground=palette["hrule_fg"])
 
 
 # ---------------------------------------------------------------------------
@@ -179,13 +197,19 @@ def parse_blocks(content: str) -> list[Block]:
         if state == "in_code_block":
             # Check for closing fence (must be at least as many backticks)
             fence_match = _RE_FENCE.match(line)
-            if fence_match and len(fence_match.group(1)) >= code_fence_len and fence_match.group(2).strip() == "":
+            if (
+                fence_match
+                and len(fence_match.group(1)) >= code_fence_len
+                and fence_match.group(2).strip() == ""
+            ):
                 # Closing fence found
-                blocks.append(Block(
-                    kind="code",
-                    content="\n".join(code_lines),
-                    meta={"lang": code_lang} if code_lang else {},
-                ))
+                blocks.append(
+                    Block(
+                        kind="code",
+                        content="\n".join(code_lines),
+                        meta={"lang": code_lang} if code_lang else {},
+                    )
+                )
                 code_lines = []
                 code_lang = ""
                 code_fence_len = 0
@@ -231,10 +255,14 @@ def parse_blocks(content: str) -> list[Block]:
                 # Store per-item levels in meta for rendering.
                 blocks[-1].meta.setdefault("levels", []).append(level)
             else:
-                blocks.append(Block(
-                    kind="ulist", content=text, level=level,
-                    meta={"levels": [level]},
-                ))
+                blocks.append(
+                    Block(
+                        kind="ulist",
+                        content=text,
+                        level=level,
+                        meta={"levels": [level]},
+                    )
+                )
             continue
 
         # 5. Ordered list item
@@ -247,10 +275,14 @@ def parse_blocks(content: str) -> list[Block]:
                 blocks[-1].content += "\n" + text
                 blocks[-1].meta.setdefault("levels", []).append(level)
             else:
-                blocks.append(Block(
-                    kind="olist", content=text, level=level,
-                    meta={"levels": [level]},
-                ))
+                blocks.append(
+                    Block(
+                        kind="olist",
+                        content=text,
+                        level=level,
+                        meta={"levels": [level]},
+                    )
+                )
             continue
 
         # 6. Blockquote
@@ -286,11 +318,13 @@ def parse_blocks(content: str) -> list[Block]:
 
     # Handle unclosed code block (Req 4.3)
     if state == "in_code_block":
-        blocks.append(Block(
-            kind="code",
-            content="\n".join(code_lines),
-            meta={"lang": code_lang} if code_lang else {},
-        ))
+        blocks.append(
+            Block(
+                kind="code",
+                content="\n".join(code_lines),
+                meta={"lang": code_lang} if code_lang else {},
+            )
+        )
 
     # Remove empty sentinel blocks used for paragraph separation
     return [b for b in blocks if b.kind != "_empty"]
@@ -343,81 +377,94 @@ def render_inline(text_widget: tk.Text, text: str, tags: tuple[str, ...]) -> Non
 
     # 1. Inline code — highest priority, protects content from further parsing
     for match in _RE_INLINE_CODE.finditer(text):
-        segments.append((
-            match.start(),
-            match.end(),
-            match.group(1),
-            ("md_inline_code",),
-            None,
-        ))
+        segments.append(
+            (
+                match.start(),
+                match.end(),
+                match.group(1),
+                ("md_inline_code",),
+                None,
+            )
+        )
 
     # 2. Links [text](url)
     for match in _RE_LINK.finditer(text):
         if not _overlaps(segments, match.start(), match.end()):
-            segments.append((
-                match.start(),
-                match.end(),
-                match.group(1),
-                ("md_link",),
-                match.group(2),
-            ))
+            segments.append(
+                (
+                    match.start(),
+                    match.end(),
+                    match.group(1),
+                    ("md_link",),
+                    match.group(2),
+                )
+            )
 
     # 3. Bold+italic ***text***
     for match in _RE_BOLD_ITALIC.finditer(text):
         if not _overlaps(segments, match.start(), match.end()):
-            segments.append((
-                match.start(),
-                match.end(),
-                match.group(1),
-                ("md_bold", "md_italic"),
-                None,
-            ))
+            segments.append(
+                (
+                    match.start(),
+                    match.end(),
+                    match.group(1),
+                    ("md_bold", "md_italic"),
+                    None,
+                )
+            )
 
     # 4. Bold **text** / __text__
     for match in _RE_BOLD_ASTERISK.finditer(text):
         if not _overlaps(segments, match.start(), match.end()):
-            segments.append((
-                match.start(),
-                match.end(),
-                match.group(1),
-                ("md_bold",),
-                None,
-            ))
+            segments.append(
+                (
+                    match.start(),
+                    match.end(),
+                    match.group(1),
+                    ("md_bold",),
+                    None,
+                )
+            )
     for match in _RE_BOLD_UNDERSCORE.finditer(text):
         if not _overlaps(segments, match.start(), match.end()):
-            segments.append((
-                match.start(),
-                match.end(),
-                match.group(1),
-                ("md_bold",),
-                None,
-            ))
+            segments.append(
+                (
+                    match.start(),
+                    match.end(),
+                    match.group(1),
+                    ("md_bold",),
+                    None,
+                )
+            )
 
     # 5. Italic *text* / _text_
     for match in _RE_ITALIC_ASTERISK.finditer(text):
         if not _overlaps(segments, match.start(), match.end()):
-            segments.append((
-                match.start(),
-                match.end(),
-                match.group(1),
-                ("md_italic",),
-                None,
-            ))
+            segments.append(
+                (
+                    match.start(),
+                    match.end(),
+                    match.group(1),
+                    ("md_italic",),
+                    None,
+                )
+            )
     for match in _RE_ITALIC_UNDERSCORE.finditer(text):
         if not _overlaps(segments, match.start(), match.end()):
-            segments.append((
-                match.start(),
-                match.end(),
-                match.group(1),
-                ("md_italic",),
-                None,
-            ))
+            segments.append(
+                (
+                    match.start(),
+                    match.end(),
+                    match.group(1),
+                    ("md_italic",),
+                    None,
+                )
+            )
 
     # Sort segments by start position
     segments.sort(key=lambda s: s[0])
 
     # Insert text segment by segment
-    global _link_counter
     pos = 0
     for start, end, content, extra_tags, url in segments:
         # Insert plain text before this segment
@@ -429,12 +476,16 @@ def render_inline(text_widget: tk.Text, text: str, tags: tuple[str, ...]) -> Non
 
         # Handle link segments: create unique tag with click binding
         if url is not None:
-            link_tag_name = f"md_link_{_link_counter}"
-            _link_counter += 1
+            link_tag_name = f"md_link_{_get_link_counter(text_widget)}"
             # Configure the unique tag with the same styling as md_link
+            # Read the current foreground from the widget's md_link tag (respects palette)
+            link_fg = (
+                text_widget.tag_cget("md_link", "foreground")
+                or MARKDOWN_TAGS["md_link"]["foreground"]
+            )
             text_widget.tag_configure(
                 link_tag_name,
-                foreground=MARKDOWN_TAGS["md_link"]["foreground"],
+                foreground=link_fg,
                 underline=MARKDOWN_TAGS["md_link"]["underline"],
             )
             # Bind click event only for valid URLs
@@ -443,7 +494,7 @@ def render_inline(text_widget: tk.Text, text: str, tags: tuple[str, ...]) -> Non
                 text_widget.tag_bind(
                     link_tag_name,
                     "<Button-1>",
-                    lambda e, u=url: webbrowser.open(u),
+                    lambda e, u=url: webbrowser.open(u),  # type: ignore[misc]
                 )
             # Apply both md_link and the unique link tag
             combined_tags = combined_tags + (link_tag_name,)
@@ -462,10 +513,7 @@ def _overlaps(
     end: int,
 ) -> bool:
     """Check if a range overlaps with any existing segment."""
-    for seg_start, seg_end, _, _, _ in segments:
-        if start < seg_end and end > seg_start:
-            return True
-    return False
+    return any(start < seg_end and end > seg_start for seg_start, seg_end, _, _, _ in segments)
 
 
 # ---------------------------------------------------------------------------
@@ -549,16 +597,16 @@ def _render_table(text_widget: tk.Text, block: Block, base_tag: str) -> None:
         return
 
     # Determine column widths
-    num_cols = max(len(row) for row in parsed_rows)
+    num_cols = max(len(parsed_row) for parsed_row in parsed_rows)
     col_widths = [0] * num_cols
-    for row in parsed_rows:
-        for j, cell in enumerate(row):
+    for parsed_row in parsed_rows:
+        for j, cell in enumerate(parsed_row):
             if j < num_cols:
                 col_widths[j] = max(col_widths[j], len(cell))
 
     # Render rows
     is_header = True
-    for row in parsed_rows:
+    for parsed_row in parsed_rows:
         if is_header:
             tags = (base_tag, "md_table_header") if base_tag else ("md_table_header",)
             is_header = False
@@ -567,7 +615,7 @@ def _render_table(text_widget: tk.Text, block: Block, base_tag: str) -> None:
         # Format cells with padding
         formatted_cells = []
         for j in range(num_cols):
-            cell = row[j] if j < len(row) else ""
+            cell = parsed_row[j] if j < len(parsed_row) else ""
             formatted_cells.append(cell.ljust(col_widths[j]))
         line = " | ".join(formatted_cells)
         text_widget.insert(tk.END, line, tags)
@@ -588,7 +636,7 @@ def _render_paragraph(text_widget: tk.Text, block: Block, base_tag: str) -> None
     text_widget.insert(tk.END, "\n", tags)
 
 
-_BLOCK_RENDERERS: dict[str, callable] = {
+_BLOCK_RENDERERS: dict[str, Callable[..., None]] = {
     "header": _render_header,
     "code": _render_code_block,
     "ulist": _render_ulist,

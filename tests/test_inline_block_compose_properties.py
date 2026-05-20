@@ -5,14 +5,13 @@
 **Validates: Requirements 1.2, 6.2, 7.2**
 """
 
-import pytest
 import tkinter as tk
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from kiro_acp_chat_client.markdown_renderer import Block, render_block, setup_tags
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -79,11 +78,13 @@ safe_text = st.text(
 block_context = st.sampled_from(["ulist", "olist", "blockquote", "paragraph"])
 
 # Inline formatting types: (open_delim, close_delim, expected_inline_tag)
-inline_formatting = st.sampled_from([
-    ("**", "**", "md_bold"),
-    ("*", "*", "md_italic"),
-    ("`", "`", "md_inline_code"),
-])
+inline_formatting = st.sampled_from(
+    [
+        ("**", "**", "md_bold"),
+        ("*", "*", "md_italic"),
+        ("`", "`", "md_inline_code"),
+    ]
+)
 
 
 # ---------------------------------------------------------------------------

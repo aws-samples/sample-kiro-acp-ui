@@ -1,7 +1,8 @@
 """Unit tests for the render_inline() function."""
 
-import pytest
 import tkinter as tk
+
+import pytest
 
 from kiro_acp_chat_client.markdown_renderer import render_inline, setup_tags
 

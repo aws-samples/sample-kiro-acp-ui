@@ -27,7 +27,9 @@ class Preferences:
     def from_dict(cls, data: dict) -> "Preferences":
         """Deserialize from a dict. Returns defaults for missing/invalid keys."""
         return cls(
-            model_id=data.get("model_id", "auto") if isinstance(data.get("model_id"), str) else "auto",
+            model_id=data.get("model_id", "auto")
+            if isinstance(data.get("model_id"), str)
+            else "auto",
             mode_id=data.get("mode_id", "") if isinstance(data.get("mode_id"), str) else "",
             log_message_content=bool(data.get("log_message_content", False)),
         )
@@ -46,7 +48,7 @@ class PreferencesManager:
         Returns defaults if file doesn't exist or is malformed JSON.
         """
         try:
-            with open(self._file_path, "r", encoding="utf-8") as f:
+            with open(self._file_path, encoding="utf-8") as f:
                 data = json.load(f)
         except FileNotFoundError:
             return Preferences()

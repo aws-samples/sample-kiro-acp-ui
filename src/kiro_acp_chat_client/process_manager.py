@@ -4,7 +4,6 @@ import asyncio
 import json
 import logging
 import signal
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +30,8 @@ class ProcessManager:
     """
 
     def __init__(self) -> None:
-        self._process: Optional[asyncio.subprocess.Process] = None
-        self._stderr_task: Optional[asyncio.Task] = None
+        self._process: asyncio.subprocess.Process | None = None
+        self._stderr_task: asyncio.Task | None = None
         self._read_buffer = b""
 
     async def start(self, timeout: float = 10.0) -> None:
@@ -58,13 +57,13 @@ class ProcessManager:
         except FileNotFoundError:
             raise ProcessStartError(
                 "Could not find kiro-cli. Please ensure it is installed and on your PATH."
-            )
-        except asyncio.TimeoutError:
+            ) from None
+        except TimeoutError:
             raise ProcessStartError(
                 "kiro-cli did not respond within the timeout period. Please try restarting."
-            )
+            ) from None
         except OSError as e:
-            raise ProcessStartError(f"Failed to start kiro-cli: {e}")
+            raise ProcessStartError(f"Failed to start kiro-cli: {e}") from e
 
         # Check if the process exited immediately after spawning
         if self._process.returncode is not None:
@@ -74,7 +73,7 @@ class ProcessManager:
             )
 
         # Start background task to drain stderr so it doesn't block the process
-        self._stderr_task = asyncio.ensure_future(self._drain_stderr())
+        self._stderr_task = asyncio.create_task(self._drain_stderr())
 
     async def _drain_stderr(self) -> None:
         """Continuously read and log stderr to prevent buffer blocking."""
@@ -84,7 +83,9 @@ class ProcessManager:
                     line = await self._process.stderr.readline()
                     if not line:
                         break
-                    logger.warning("kiro-cli stderr: %s", line.decode("utf-8", errors="replace").rstrip()[:500])
+                    logger.warning(
+                        "kiro-cli stderr: %s", line.decode("utf-8", errors="replace").rstrip()[:500]
+                    )
                 else:
                     break
         except Exception as e:  # nosec B110 — intentional: prevent stderr reader from crashing app
@@ -104,6 +105,8 @@ class ProcessManager:
         if not self.is_running:
             raise ProcessTerminatedError("Cannot write: process is not running.")
 
+        assert self._process is not None
+        assert self._process.stdin is not None
         line = json.dumps(message, separators=(",", ":"), ensure_ascii=False) + "\n"
         # Log method/id only — message bodies may contain sensitive user content
         method = message.get("method", "response")
@@ -127,6 +130,9 @@ class ProcessManager:
         if not self.is_running:
             raise ProcessTerminatedError("Cannot read: process is not running.")
 
+        assert self._process is not None
+        assert self._process.stdout is not None
+
         # Read until we have a complete line (newline-delimited JSON)
         while b"\n" not in self._read_buffer:
             try:
@@ -135,13 +141,20 @@ class ProcessManager:
                 logger.warning("Read error: %s", e)
                 raise ProcessTerminatedError(
                     "Connection to Kiro lost. Please restart the application."
-                )
+                ) from e
             if not chunk:
                 # EOF — process closed stdout
                 returncode = self._process.returncode
-                logger.warning("kiro-cli stdout EOF. Exit code: %s, buffer size: %d", returncode, len(self._read_buffer))
+                logger.warning(
+                    "kiro-cli stdout EOF. Exit code: %s, buffer size: %d",
+                    returncode,
+                    len(self._read_buffer),
+                )
                 if self._read_buffer:
-                    logger.warning("Partial buffer content: %s", self._read_buffer[:500].decode("utf-8", errors="replace"))
+                    logger.warning(
+                        "Partial buffer content: %s",
+                        self._read_buffer[:500].decode("utf-8", errors="replace"),
+                    )
                 raise ProcessTerminatedError(
                     "Connection to Kiro lost. Please restart the application."
                 )
@@ -161,10 +174,14 @@ class ProcessManager:
                     logger.warning("Read error: %s", e)
                     raise ProcessTerminatedError(
                         "Connection to Kiro lost. Please restart the application."
-                    )
+                    ) from e
                 if not chunk:
                     returncode = self._process.returncode
-                    logger.warning("kiro-cli stdout EOF. Exit code: %s, buffer size: %d", returncode, len(self._read_buffer))
+                    logger.warning(
+                        "kiro-cli stdout EOF. Exit code: %s, buffer size: %d",
+                        returncode,
+                        len(self._read_buffer),
+                    )
                     raise ProcessTerminatedError(
                         "Connection to Kiro lost. Please restart the application."
                     )
@@ -173,7 +190,7 @@ class ProcessManager:
             line = line_bytes.decode("utf-8").strip()
 
         # Log method/id only — response bodies may contain sensitive content
-        parsed = json.loads(line)
+        parsed: dict = json.loads(line)
         method = parsed.get("method", "response")
         msg_id = parsed.get("id", "-")
         logger.debug("<<< [id=%s] %s", msg_id, method)
@@ -199,7 +216,7 @@ class ProcessManager:
 
         try:
             await asyncio.wait_for(self._process.wait(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # Process didn't exit gracefully, force kill
             try:
                 self._process.kill()

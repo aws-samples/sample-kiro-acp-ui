@@ -3,7 +3,7 @@
 # Feature: kiro-acp-chat-client, Property 1: JSON-RPC message serialization round-trip
 """
 
-from hypothesis import given, settings, assume
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from kiro_acp_chat_client.models import (
@@ -11,7 +11,6 @@ from kiro_acp_chat_client.models import (
     from_json_line,
     to_json_line,
 )
-
 
 # Strategy for generating JSON-serializable primitive values
 json_primitives = st.one_of(

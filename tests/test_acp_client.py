@@ -1,7 +1,8 @@
 """Unit tests for the ACPClient class."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from kiro_acp_chat_client.acp_client import ACPClient
 from kiro_acp_chat_client.process_manager import ProcessManager
@@ -111,15 +112,11 @@ class TestCreateSession:
                 "sessionId": "sess_xyz789",
                 "models": {
                     "currentModelId": "auto",
-                    "availableModels": [
-                        {"modelId": "model-1", "name": "Model One"}
-                    ],
+                    "availableModels": [{"modelId": "model-1", "name": "Model One"}],
                 },
                 "modes": {
                     "currentModeId": "kiro_default",
-                    "availableModes": [
-                        {"id": "Developer", "name": "Developer"}
-                    ],
+                    "availableModes": [{"id": "Developer", "name": "Developer"}],
                 },
             },
         }
@@ -130,15 +127,11 @@ class TestCreateSession:
             "sessionId": "sess_xyz789",
             "models": {
                 "currentModelId": "auto",
-                "availableModels": [
-                    {"modelId": "model-1", "name": "Model One"}
-                ],
+                "availableModels": [{"modelId": "model-1", "name": "Model One"}],
             },
             "modes": {
                 "currentModeId": "kiro_default",
-                "availableModes": [
-                    {"id": "Developer", "name": "Developer"}
-                ],
+                "availableModes": [{"id": "Developer", "name": "Developer"}],
             },
         }
 

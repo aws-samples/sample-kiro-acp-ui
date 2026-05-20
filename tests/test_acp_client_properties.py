@@ -3,15 +3,14 @@
 # Feature: model-agent-preferences, Property 3: Selection sends correct ACP request
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from kiro_acp_chat_client.acp_client import ACPClient
 from kiro_acp_chat_client.process_manager import ProcessManager
-
 
 # Strategy for generating non-empty string IDs (session IDs, model IDs, mode IDs)
 id_strings = st.text(

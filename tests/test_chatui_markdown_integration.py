@@ -6,8 +6,10 @@ assistant messages while leaving user messages and error messages unaffected.
 Validates: Requirements 12.1, 12.2, 12.3, 12.4
 """
 
-import pytest
+import contextlib
 import tkinter as tk
+
+import pytest
 
 from kiro_acp_chat_client.ui import ChatUI
 
@@ -26,10 +28,8 @@ def chat_ui():
     ui = ChatUI(root, on_send=lambda t: None, on_close=lambda: None)
     yield ui, root
 
-    try:
+    with contextlib.suppress(tk.TclError):
         root.destroy()
-    except tk.TclError:
-        pass
 
 
 class TestAssistantMessageFormattedOutput:
@@ -246,8 +246,17 @@ class TestPlainTextTransparency:
         ui.append_assistant_message("plain text without any markdown")
 
         # Check that no markdown-specific tags are applied
-        for tag in ["md_bold", "md_italic", "md_inline_code", "md_code_block",
-                    "md_h1", "md_h2", "md_h3", "md_blockquote", "md_link"]:
+        for tag in [
+            "md_bold",
+            "md_italic",
+            "md_inline_code",
+            "md_code_block",
+            "md_h1",
+            "md_h2",
+            "md_h3",
+            "md_blockquote",
+            "md_link",
+        ]:
             ranges = ui._message_display.tag_ranges(tag)
             assert len(ranges) == 0, f"Tag {tag} should not be applied to plain text"
 

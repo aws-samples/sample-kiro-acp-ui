@@ -1,7 +1,6 @@
 """Unit tests for parse_blocks() function."""
 
-import pytest
-from kiro_acp_chat_client.markdown_renderer import Block, parse_blocks
+from kiro_acp_chat_client.markdown_renderer import parse_blocks
 
 
 class TestEmptyInput:
@@ -208,7 +207,7 @@ class TestBlockquotes:
         blocks = parse_blocks(content)
         assert len(blocks) == 1
         assert blocks[0].kind == "blockquote"
-        assert "Line 1\nLine 2\nLine 3" == blocks[0].content
+        assert blocks[0].content == "Line 1\nLine 2\nLine 3"
 
     def test_blockquote_with_empty_prefix(self):
         content = "> First\n>\n> Third"
@@ -265,7 +264,10 @@ class TestMixedContent:
         assert blocks[1].kind == "paragraph"
 
     def test_full_document(self):
-        content = "# Title\n\nSome intro text.\n\n- Item 1\n- Item 2\n\n```python\ncode()\n```\n\n---\n\n> A quote"
+        content = (
+            "# Title\n\nSome intro text.\n\n- Item 1\n- Item 2\n\n"
+            "```python\ncode()\n```\n\n---\n\n> A quote"
+        )
         blocks = parse_blocks(content)
         kinds = [b.kind for b in blocks]
         assert "header" in kinds

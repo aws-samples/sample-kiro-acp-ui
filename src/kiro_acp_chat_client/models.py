@@ -2,8 +2,7 @@
 
 import json
 import time
-from dataclasses import dataclass, field, asdict
-from typing import Optional, Union
+from dataclasses import asdict, dataclass, field
 
 
 @dataclass
@@ -22,8 +21,8 @@ class JsonRpcResponse:
 
     jsonrpc: str = "2.0"
     id: int = 0
-    result: Optional[dict] = None
-    error: Optional[dict] = None
+    result: dict | None = None
+    error: dict | None = None
 
 
 @dataclass
@@ -50,7 +49,7 @@ class Conversation:
     """The current session's conversation state."""
 
     messages: list[Message] = field(default_factory=list)
-    session_id: Optional[str] = None
+    session_id: str | None = None
     is_waiting: bool = False  # Whether we're waiting for a response
 
     def add_user_message(self, text: str) -> Message:
@@ -67,15 +66,13 @@ class Conversation:
 
     def add_error(self, text: str) -> Message:
         """Add an error message to the conversation."""
-        msg = Message(
-            role="assistant", content=text, timestamp=time.time(), is_error=True
-        )
+        msg = Message(role="assistant", content=text, timestamp=time.time(), is_error=True)
         self.messages.append(msg)
         return msg
 
 
 # Type alias for any JSON-RPC message
-JsonRpcMessage = Union[JsonRpcRequest, JsonRpcResponse, JsonRpcNotification]
+JsonRpcMessage = JsonRpcRequest | JsonRpcResponse | JsonRpcNotification
 
 
 def to_json_line(message: JsonRpcMessage) -> str:

@@ -7,15 +7,13 @@ Validates: Requirements 4.1, 4.3, 4.4, 4.5
 """
 
 import json
-import os
-import tempfile
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from kiro_acp_chat_client.acp_client import ACPClient
 from kiro_acp_chat_client.controller import ChatController
-from kiro_acp_chat_client.preferences_manager import Preferences, PreferencesManager
+from kiro_acp_chat_client.preferences_manager import PreferencesManager
 from kiro_acp_chat_client.process_manager import (
     ProcessManager,
     ProcessTerminatedError,
@@ -70,7 +68,7 @@ class TestApplicationStartup:
     async def test_startup_initializes_and_creates_session(
         self, controller, mock_process_manager, mock_ui
     ):
-        """Startup sends initialize request, receives capabilities, creates session, stores session ID."""
+        """Startup sends initialize request, receives capabilities, creates session."""
         # Mock process responses: first for initialize, second for session/new
         mock_process_manager.read_message.side_effect = [
             # Initialize response
@@ -190,9 +188,7 @@ class TestFullSendReceiveCycle:
         mock_ui.hide_typing_indicator.assert_called_once()
 
         # Verify full assistant response displayed
-        mock_ui.append_assistant_message.assert_called_once_with(
-            "Hello, how can I help?"
-        )
+        mock_ui.append_assistant_message.assert_called_once_with("Hello, how can I help?")
 
         # Verify input was cleared and re-enabled
         mock_ui.clear_input.assert_called_once()
@@ -238,17 +234,13 @@ class TestFullSendReceiveCycle:
 class TestGracefulShutdown:
     """Test graceful shutdown sequence."""
 
-    async def test_shutdown_calls_process_manager_shutdown(
-        self, controller, mock_process_manager
-    ):
+    async def test_shutdown_calls_process_manager_shutdown(self, controller, mock_process_manager):
         """controller.shutdown() delegates to process_manager.shutdown()."""
         await controller.shutdown()
 
         mock_process_manager.shutdown.assert_called_once()
 
-    async def test_shutdown_after_active_session(
-        self, controller, mock_process_manager, mock_ui
-    ):
+    async def test_shutdown_after_active_session(self, controller, mock_process_manager, mock_ui):
         """Shutdown works correctly after an active session was established."""
         # Setup: complete startup
         mock_process_manager.read_message.side_effect = [
@@ -315,9 +307,7 @@ class TestProcessCrash:
         await controller.send_message("Hello")
 
         # Verify error is displayed
-        mock_ui.append_error.assert_called_once_with(
-            "Cannot write: process is not running."
-        )
+        mock_ui.append_error.assert_called_once_with("Cannot write: process is not running.")
 
         # Verify typing indicator is hidden
         mock_ui.hide_typing_indicator.assert_called_once()
@@ -377,7 +367,9 @@ class TestPreferenceFlowIntegration:
     def pref_controller(self, pref_mock_ui, pref_mock_process_manager, real_preferences_manager):
         """Create a ChatController with real PreferencesManager."""
         acp = ACPClient(pref_mock_process_manager)
-        return ChatController(pref_mock_ui, acp, pref_mock_process_manager, real_preferences_manager)
+        return ChatController(
+            pref_mock_ui, acp, pref_mock_process_manager, real_preferences_manager
+        )
 
     async def test_startup_with_models_and_modes_in_session_response(
         self, pref_controller, pref_mock_process_manager, pref_mock_ui
@@ -449,7 +441,10 @@ class TestPreferenceFlowIntegration:
                     "models": {
                         "currentModelId": "auto",
                         "availableModels": [
-                            {"modelId": "anthropic.claude-sonnet-4-20250514", "name": "Claude Sonnet"},
+                            {
+                                "modelId": "anthropic.claude-sonnet-4-20250514",
+                                "name": "Claude Sonnet",
+                            },
                         ],
                     },
                     "modes": {
@@ -473,7 +468,7 @@ class TestPreferenceFlowIntegration:
         await pref_controller.on_model_changed(new_model_id)
 
         # Verify preferences file is updated with new model_id
-        with open(temp_prefs_file, "r") as f:
+        with open(temp_prefs_file) as f:
             saved_prefs = json.load(f)
         assert saved_prefs["model_id"] == new_model_id
 
@@ -498,7 +493,10 @@ class TestPreferenceFlowIntegration:
                     "models": {
                         "currentModelId": "auto",
                         "availableModels": [
-                            {"modelId": "anthropic.claude-sonnet-4-20250514", "name": "Claude Sonnet"},
+                            {
+                                "modelId": "anthropic.claude-sonnet-4-20250514",
+                                "name": "Claude Sonnet",
+                            },
                         ],
                     },
                     "modes": {

@@ -3,10 +3,10 @@
 # Feature: markdown-rendering, Property 9: Link rendering removes syntax and applies link styling
 """
 
-import pytest
 import tkinter as tk
 
-from hypothesis import given, settings, assume
+import pytest
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from kiro_acp_chat_client.markdown_renderer import render_inline, setup_tags
@@ -71,7 +71,8 @@ def test_link_rendering_removes_syntax_and_applies_styling(link_text, url):
     brackets, parentheses, or URL) with underline and link-color styling
     applied (md_link tag).
 
-    # Feature: markdown-rendering, Property 9: Link rendering removes syntax and applies link styling
+    # Feature: markdown-rendering, Property 9: Link rendering removes syntax
+    # and applies link styling
 
     **Validates: Requirements 10.1**
     """
@@ -89,9 +90,7 @@ def test_link_rendering_removes_syntax_and_applies_styling(link_text, url):
 
         # 2. The md_link tag is applied to the link text
         tags = _get_tags_at(w, "1.0")
-        assert "md_link" in tags, (
-            f"Expected 'md_link' tag at position 1.0, got tags: {tags}"
-        )
+        assert "md_link" in tags, f"Expected 'md_link' tag at position 1.0, got tags: {tags}"
 
         # 3. Brackets, parentheses, and URL are not visible in rendered output
         # The rendered text should be exactly the link text — no extra syntax

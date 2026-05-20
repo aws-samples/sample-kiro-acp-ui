@@ -1,18 +1,18 @@
 """Property-based tests for table rendering.
 
-# Feature: markdown-rendering, Property 10: Table rendering produces aligned output without separator row
+# Feature: markdown-rendering, Property 10: Table rendering produces aligned
+# output without separator row
 
 **Validates: Requirements 11.1, 11.2, 11.3**
 """
 
-import pytest
 import tkinter as tk
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from kiro_acp_chat_client.markdown_renderer import Block, render_block, setup_tags
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -118,7 +118,8 @@ def test_table_rendering_produces_aligned_output_without_separator_row(table_dat
     bold formatting on the header row, consistent column alignment, and the
     separator row (|---|---|) omitted from the displayed output.
 
-    # Feature: markdown-rendering, Property 10: Table rendering produces aligned output without separator row
+    # Feature: markdown-rendering, Property 10: Table rendering produces
+    # aligned output without separator row
     """
     headers, data_rows, table_content = table_data
 
