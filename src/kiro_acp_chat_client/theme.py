@@ -1,5 +1,6 @@
-# src/kiro_acp_chat_client/theme.py
-import subprocess
+"""Dark mode detection and color palette management."""
+
+import subprocess  # nosec B404 — required for macOS dark mode detection
 import sys
 from typing import TypedDict
 
@@ -61,7 +62,7 @@ def detect_dark_mode() -> bool:
     if sys.platform != "darwin":
         return False
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 B607 — hardcoded command, no user input
             ["defaults", "read", "-g", "AppleInterfaceStyle"],
             capture_output=True,
             text=True,
